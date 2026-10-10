@@ -1,2 +1,18 @@
+# Core
 torch
+transformers
+safetensors
 numpy
+pandas
+pyarrow
+pyyaml
+
+# Analysis / probes
+scikit-learn
+scipy
+matplotlib
+
+# Harvesting: pin Undercurrent (v0.x) and vLLM once confirmed in Week 3
+# undercurrent==0.x.y
+# vllm>=0.28,<0.29
+# bitsandbytes

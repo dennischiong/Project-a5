@@ -229,4 +229,11 @@ runs/
 wandb/
 lightning_logs/
 outputs/
-data/
+
+# Raw dataset downloads stay local; pairs tables (data/*.parquet) are tracked
+data/raw/
+
+# Harvested activations and archives live on Drive, never in git
+harvest_out/
+*.tpxz
+*.tpxz.json
