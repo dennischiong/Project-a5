@@ -1,0 +1,13 @@
+{
+  "file": "prereg.md",
+  "sha256": "6fe41bee09f2fcbdba67d42f8e5a625362b43bfcd16d20fb4040757bd7d568ab",
+  "date": "2026-10-17",
+  "locked_at_utc": "2026-10-17T11:42:21Z",
+  "amendments": [
+    {
+      "date": "2026-10-29",
+      "sha256": "84e2d9d451ab368d59d9415f4236842a49b6e0413a5dab69e282fb63149c04fa",
+      "note": "Editorial wording only (Status line and Notes): removed process remarks about how the thresholds were fixed. No change to any hypothesis, metric, split, position, layer or threshold."
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# prereg.md is locked by its sha256 (prereg_lock.json): keep its bytes identical on every checkout
+prereg.md -text

@@ -232,6 +232,8 @@ outputs/
 
 # Raw dataset downloads stay local; pairs tables (data/*.parquet) are tracked
 data/raw/
+# Pairs tables with prompt text (e.g. pairs_table_v1_final-2.csv) never go in git
+data/*.csv
 
 # Harvested activations and archives live on Drive, never in git
 harvest_out/
