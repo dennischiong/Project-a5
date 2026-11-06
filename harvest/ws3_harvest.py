@@ -1,9 +1,9 @@
-"""WS3 prompt-position harvest for Hasif's models (Gemma-2-9B-it, Mistral-7B-Instruct-v0.3) with my own HF pipeline,
-so A2, A5, A7 and A8 can run without the shared harness. NEEDS A GPU. Same output format as ws3_pilot_extract.py, so
+"""WS3 prompt-position harvest (Gemma-2-9B-it, Mistral-7B-Instruct-v0.3, Qwen) with a small HF pipeline,
+so A2, A5, A7 and A8 can also run alongside the shared harness. Needs a GPU. Same output format as ws3_pilot_extract.py, so
 analysis/ws3_pilot.run_all reads it unchanged.
 
-Prints ONLY ids, counts and numbers: never prompt text or model replies. Text is read from the pairs table into memory
-and is never written anywhere (prompts are identified by a sha256 hash).
+Prints only ids, counts and numbers, not prompt text or model replies. Text is read from the pairs table into memory
+and is not written anywhere (prompts are identified by a sha256 hash).
 
 Serving configs (work plan s.7.3). This pipeline is HF transformers, batch 1, no padding, one forward pass per prompt:
   c1  bf16 weights               = Track 3 C1 (HF bf16, batch 1). A full run with --config c1 is also the WS3 dataset.
@@ -18,12 +18,14 @@ Per prompt, at prompt[-1] (chat template with add_generation_prompt=True, BOS fr
 
 Outputs in --out: prompts.parquet, pairs.parquet, prenorm_last.npy, postnorm_last.npy, sweep.npy, meta.json.
 Resumable: every CHUNK prompts are saved to --out/chunks/; a rerun skips finished chunks (same prompt list only).
+A prompt that runs out of GPU memory (e.g. Mistral-7B C1 in bf16 on a 15 GiB T4: ~1 GiB headroom) is skipped and
+marked non-finite rather than truncated; the count is printed per chunk and stored as meta[n_oom]. No KV cache is kept.
 
 Pairs table: Dennis's pairs_table_v1_final-2.csv (data/, the team's final table; WildJailbreak + SORRY-Bench rows).
 
   python harvest/ws3_harvest.py --model mistral-7b --config c1
   python harvest/ws3_harvest.py --model mistral-7b --config c6 --subset 4000
-  python harvest/ws3_harvest.py --model qwen25-1p5b --config c1 --dtype float16      # the pilot model, free T4
+  python harvest/ws3_harvest.py --model qwen25-1p5b --config c1 --dtype float16      # the pilot model
 """
 import argparse
 import hashlib
@@ -54,6 +56,9 @@ MODELS = {
                        last_instruction=-2, note=""),
     "qwen25-1p5b": dict(id="Qwen/Qwen2.5-1.5B-Instruct", attn="sdpa", min_gib_bf16=4.0, fp16_ok=True,
                         last_instruction=-6, note="plumbing check only"),
+    # Complements the team's Qwen2.5-7B harvest on the Track 3 subset, adding next-token stats and post-norm vectors
+    "qwen25-7b": dict(id="Qwen/Qwen2.5-7B-Instruct", attn="sdpa", min_gib_bf16=16.0, fp16_ok=True,
+                      last_instruction=-6, note="same chat template as qwen25-1p5b"),
 }
 CONFIGS = {"c1": "hf-bf16-bs1", "c6": "hf-nf4-bs1"}
 PAIRS_FINAL = str(REPO / "data" / "pairs_table_v1_final-2.csv")   # git-ignored: the table holds prompt text
@@ -122,15 +127,13 @@ def load_model(spec, config, dtype):
         from transformers import BitsAndBytesConfig
         kw["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
                                                        bnb_4bit_compute_dtype=td, bnb_4bit_use_double_quant=False)
-        kw["device_map"] = {"": 0}
+    kw["device_map"] = {"": 0}   # load straight onto the GPU: a 7B model in bf16 (~14.5 GB) does not fit Colab's CPU RAM
     try:
         model = AutoModelForCausalLM.from_pretrained(spec["id"], dtype=td, **kw)
     except TypeError:   # older transformers
         model = AutoModelForCausalLM.from_pretrained(spec["id"], torch_dtype=td, **kw)
-    if config == "c1":
-        if model.dtype != td:
-            model = model.to(td)
-        model = model.to("cuda")
+    if config == "c1" and model.dtype != td:
+        model = model.to(td)
     return tok, model.eval()
 
 
@@ -142,27 +145,36 @@ def run_chunk(tok, model, texts, layers, ref_ids, comp_ids):
     n, d = len(texts), model.config.hidden_size
     out = dict(prenorm=np.zeros((n, d), np.float32), postnorm=np.zeros((n, d), np.float32),
                sweep=np.zeros((n, len(layers), d), np.float16), n_tokens=np.zeros(n, np.int32),
-               refusal_mass=np.zeros(n, np.float32), compliance_mass=np.zeros(n, np.float32), finite=np.zeros(n, bool))
+               refusal_mass=np.zeros(n, np.float32), compliance_mass=np.zeros(n, np.float32), finite=np.zeros(n, bool),
+               oom=np.zeros(n, bool))
     try:
         with torch.no_grad():
             for i, text in enumerate(texts):
                 rendered = tok.apply_chat_template([{"role": "user", "content": text}], tokenize=False,
                                                    add_generation_prompt=True)
                 ids = tok(rendered, add_special_tokens=False, return_tensors="pt").input_ids.to("cuda")
+                out["n_tokens"][i] = ids.shape[1]
                 try:
-                    o = model(ids, output_hidden_states=True, logits_to_keep=1)
-                except TypeError:
-                    o = model(ids, output_hidden_states=True)
+                    try:
+                        o = model(ids, output_hidden_states=True, logits_to_keep=1, use_cache=False)
+                    except TypeError:
+                        o = model(ids, output_hidden_states=True, use_cache=False)
+                except torch.cuda.OutOfMemoryError:
+                    # skipped, not truncated: the prompt stays non-finite and is dropped with its pairs downstream
+                    o = None
+                    torch.cuda.empty_cache()
+                    out["oom"][i] = True
+                    continue
                 hs = o.hidden_states
                 pre = cap["pre"].cpu().numpy()
                 post = hs[-1][0, -1].float().cpu().numpy()
                 sw = np.stack([hs[l][0, -1].float().cpu().numpy() for l in layers])
                 p = torch.softmax(o.logits[0, -1].float(), -1)
                 out["prenorm"][i], out["postnorm"][i], out["sweep"][i] = pre, post, sw.astype(np.float16)
-                out["n_tokens"][i] = ids.shape[1]
+                del o, hs
                 out["refusal_mass"][i] = float(p[ref_ids].sum())
                 out["compliance_mass"][i] = float(p[comp_ids].sum())
-                # float16 sweep can overflow on large residuals: such a prompt is marked non-finite, never clipped
+                # float16 sweep can overflow on large residuals: such a prompt is marked non-finite rather than clipped
                 out["finite"][i] = bool(np.isfinite(pre).all() and np.isfinite(post).all()
                                         and np.isfinite(out["sweep"][i]).all())
     finally:
@@ -252,9 +264,11 @@ def main():
         left = sum(min(CHUNK, len(keys) - k * CHUNK) for k in range(c + 1, n_chunks)
                    if not (out / "chunks" / f"chunk_{k:03d}.npz").exists())
         print(f"chunk {c + 1}/{n_chunks}: {len(texts)} prompts in {time.time() - tc:.0f} s | non-finite "
-              f"{int((~arr['finite']).sum())} | max tokens {int(arr['n_tokens'].max())} | ETA {left * rate / 60:.1f} min")
+              f"{int((~arr['finite']).sum())} (out of memory {int(arr['oom'].sum())}) | max tokens {int(arr['n_tokens'].max())} | ETA {left * rate / 60:.1f} min")
 
     parts = [dict(np.load(out / "chunks" / f"chunk_{c:03d}.npz")) for c in range(n_chunks)]
+    for p in parts:   # chunks saved before 3 Nov have no oom array (nothing was skipped then)
+        p.setdefault("oom", np.zeros(len(p["prenorm"]), bool))
     cat = {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
     assert len(cat["prenorm"]) == len(keys)
     row = {k: i for i, k in enumerate(keys)}
@@ -274,7 +288,7 @@ def main():
                 template_sha256=hashlib.sha256((tok.chat_template or "").encode()).hexdigest()[:16],
                 system_prompt="none added; the model's template defaults are kept", keys_hash=kh,
                 n_prompts=len(keys), n_pairs=plan["source"].value_counts().to_dict(),
-                n_nonfinite=int((~cat["finite"]).sum()), max_tokens=int(cat["n_tokens"].max()), truncation="none",
+                n_nonfinite=int((~cat["finite"]).sum()), n_oom=int(cat["oom"].sum()), max_tokens=int(cat["n_tokens"].max()), truncation="none",
                 refusal_words=list(wp.REFUSAL_WORDS), refusal_token_ids=ref_ids,
                 compliance_words=list(wp.COMPLIANCE_WORDS), compliance_token_ids=comp_ids,
                 pairs_table=a.pairs, pairs_table_sha256=hashlib.sha256(Path(a.pairs).read_bytes()).hexdigest()[:16],
@@ -292,7 +306,7 @@ def main():
             shutil.copy(p, out / p.name)
     shutil.rmtree(out / "chunks")   # the assembled arrays replace the chunks (halves the Drive footprint)
     print(f"DONE in {(time.time() - t0) / 60:.1f} min: {len(keys)} prompts, {len(plan)} pairs, "
-          f"{meta['n_nonfinite']} non-finite, max {meta['max_tokens']} tokens, nothing truncated, no text written -> {out}")
+          f"{meta['n_nonfinite']} non-finite ({meta['n_oom']} out of memory), max {meta['max_tokens']} tokens, nothing truncated, no text written -> {out}")
 
 
 def wp_first_ids(tok):

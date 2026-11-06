@@ -199,7 +199,7 @@ def draw_dependency(rows, path):
         fill = ps.STATUS_COLOR[r["state"]]
         box = dg.node(ax, 45, iy[r["name"]], f"{r['name']}\n{r['state']}", w=27, h=9, fc=fill, fs=6.6,
                       ls="-" if r["state"] == "READY" else "--")
-        for giver in givers(r["who"]):  # "Kayson / mentor" -> both
+        for giver in givers(r["who"]):  # Kayson / mentor -> both
             dg.arrow(ax, people[giver], box, lw=0.9, sides=("right", "left"))
         for u in r["unlocks"]:
             dg.arrow(ax, box, tasks[u], lw=0.8, sides=("right", "left"), color=ps.MUTED)

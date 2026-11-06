@@ -2,11 +2,12 @@
 'KIND | model | layer | position' (KIND = SYNTHETIC / PILOT / RESULT). Numbers only, never text.
 
 Concept diagrams (the maths as a picture): concept_a2, concept_a5, concept_a7, concept_a8, concept_x5
-A2 (= F2): a2_f2_histograms, a2_tactic_bars, a2_models_line
+A2 (= F2): a2_f2_histograms, a2_tactic_bars, a2_models_line; f2_combined = paper figure F2 (histograms + models)
 A5: a5_cosine_heatmap, a5_pca_scatter, a5_principal_angles, a5_knn_stacked
 A7: a7_style_content
 A8: a8_spectrum, a8_angle_arc
 X5: x5_cosine_heatmap, x5_dp_dotplot
+Layer sweep (exploratory): a2_layer_sweep
 ws3_summary: one page tiling the main figure of each analysis
 render_all_synthetic(folder): draws every figure above on SYNTHETIC data (tests, previews, contact sheet)
 """
@@ -27,7 +28,7 @@ def _ci_err(est, lo, hi):
     return np.vstack([np.clip(est - lo, 0, None), np.clip(hi - est, 0, None)])
 
 
-TITLE_NOTE = None  # e.g. "EXPLORATORY (not pre-registered)": set by the notebook for A5 / A8 results
+TITLE_NOTE = None  # e.g. EXPLORATORY (not pre-registered): set by the notebook for A5 / A8 results
 
 
 def _finish(fig, kind, model, layer, position, what, footer, path):
@@ -57,7 +58,7 @@ def concept_a2(path):
     ax.scatter(*B.T, s=12, color=ps.BLUE, alpha=0.6, label="vanilla benign prompts")
     mh, mb = H.mean(0), B.mean(0)
     r = (mh - mb) / np.linalg.norm(mh - mb)
-    # the r_hat line through the benign mean, extended both ways (the "ruler" every prompt is projected onto)
+    # the r_hat line through the benign mean, extended both ways (the ruler every prompt is projected onto)
     ax.plot(*np.array([mb - 1.5 * r, mh + 1.2 * r]).T, color=ps.MUTED, lw=1, ls=":")
     _arrow(ax, mb, mh, ps.INK, lw=2.4)
     ax.annotate("r_hat: benign mean -> harmful mean", xy=mb + 0.3 * (mh - mb), xytext=(-3.9, 2.4), fontsize=7.5,
@@ -160,6 +161,14 @@ def concept_x5(path):
 def a2_f2_histograms(a2, meta, path, kind, model, layer, position="prompt[-1]"):
     """F2: 2x2 projection histograms on held-out pairs, dashed line = train midpoint."""
     ps.apply_style()
+    fig, axes = plt.subplots(2, 2, figsize=(10, 6), sharex=True, sharey=True)
+    _f2_hists(axes, a2, meta)
+    return _finish(fig, kind, model, layer, position, "F2 (A2): projection onto r_hat, held-out pairs",
+                   "r_hat fitted on vanilla TRAIN pairs only; dashed line = midpoint of the train means", path)
+
+
+def _f2_hists(axes, a2, meta):
+    """Draw the F2 2x2 histograms into a 2x2 array of axes."""
     harm = (meta["intent"] == "harmful").to_numpy()
     ev = (meta["split"] != "train").to_numpy()
     pv, pa, mid = a2["pv"], a2["pa"], a2["midpoint"]
@@ -167,7 +176,6 @@ def a2_f2_histograms(a2, meta, path, kind, model, layer, position="prompt[-1]"):
              ("benign", "vanilla"): pv[ev & ~harm], ("benign", "adversarial"): pa[ev & ~harm]}
     allv = np.concatenate([v for v in cells.values() if len(v)])
     bins = np.linspace(allv.min(), allv.max(), 22)
-    fig, axes = plt.subplots(2, 2, figsize=(10, 6), sharex=True, sharey=True)
     for i, intent in enumerate(("harmful", "benign")):
         for j, form in enumerate(("vanilla", "adversarial")):
             ax, v = axes[i, j], cells[(intent, form)]
@@ -180,8 +188,6 @@ def a2_f2_histograms(a2, meta, path, kind, model, layer, position="prompt[-1]"):
     for ax in axes[:, 0]:
         ax.set_ylabel("prompts (count)")
     axes[0, 0].text(mid, axes[0, 0].get_ylim()[1] * 0.9, " train midpoint (H1 line)", fontsize=7, color=ps.INK2)
-    return _finish(fig, kind, model, layer, position, "F2 (A2): projection onto r_hat, held-out pairs",
-                   "r_hat fitted on vanilla TRAIN pairs only; dashed line = midpoint of the train means", path)
 
 
 def a2_tactic_bars(a2, path, kind, model, layer, position="prompt[-1]"):
@@ -207,22 +213,63 @@ def a2_tactic_bars(a2, path, kind, model, layer, position="prompt[-1]"):
 
 
 def a2_models_line(by_model, path, kind, layer, position="prompt[-1]"):
-    """Mean dp per model (harmful and benign) with 95% CIs. by_model: {model: a2 dict}."""
+    """Mean dp per model (harmful and benign) with 95% CIs. by_model: {model: a2 dict}. When every a2 dict also has
+    d ({intent: (d, lo, hi)}), a second panel shows Cohen's d, the scale-free number to compare models by."""
     ps.apply_style()
+    panels = _model_panels(by_model)
+    fig, axes = plt.subplots(1, len(panels), figsize=(7.5 if len(panels) == 1 else 11, 3.8), squeeze=False)
+    _models_lines(axes[0], by_model, panels)
+    return _finish(fig, kind, "several (x-axis)", layer, position, "A2: mean dp per model", "held-out pairs", path)
+
+
+def _model_panels(by_model):
+    panels = [("overall", "mean dp per pair (model's own units)")]
+    if all("d" in a2 for a2 in by_model.values()):
+        panels.append(("d", "Cohen's d of dp (scale-free)"))
+    return panels
+
+
+def _models_lines(axes, by_model, panels):
+    """Draw one A2-across-models panel per (key, ylabel) in panels."""
     models = list(by_model)
     x = np.arange(len(models))
-    fig, ax = plt.subplots(figsize=(7.5, 3.8))
-    for intent, ls in (("harmful", "-"), ("benign", "--")):
-        est = [by_model[m]["overall"][intent][0] for m in models]
-        lo = [by_model[m]["overall"][intent][1] for m in models]
-        hi = [by_model[m]["overall"][intent][2] for m in models]
-        ax.errorbar(x, est, yerr=_ci_err(est, lo, hi), color=ps.INTENT_COLOR[intent], ls=ls, marker="o", capsize=4,
-                    label=f"{intent} pairs (95% CI)")
-    ax.axhline(0, color=ps.INK, lw=1)
-    ax.set_xticks(x, models, fontsize=7.5)
-    ax.set(ylabel="mean dp per pair", xlabel="model")
-    ax.legend(fontsize=7)
-    return _finish(fig, kind, "several (x-axis)", layer, position, "A2: mean dp per model", "held-out pairs", path)
+    for ax, (key, ylabel) in zip(axes, panels):
+        for intent, ls in (("harmful", "-"), ("benign", "--")):
+            est = [by_model[m][key][intent][0] for m in models]
+            lo = [by_model[m][key][intent][1] for m in models]
+            hi = [by_model[m][key][intent][2] for m in models]
+            ax.errorbar(x, est, yerr=_ci_err(est, lo, hi), color=ps.INTENT_COLOR[intent], ls=ls, marker="o",
+                        capsize=4, label=f"{intent} pairs (95% CI)")
+        ax.axhline(0, color=ps.INK, lw=1)
+        ax.set_xticks(x, models, fontsize=7.5)
+        ax.set(ylabel=ylabel, xlabel="model")
+        ax.legend(fontsize=7)
+
+
+def f2_combined(a2, meta, by_model, path, kind, model, layer, position="prompt[-1]"):
+    """Paper figure F2 in one file: (a) the 2x2 histograms of one model, (b) mean dp and Cohen's d per model."""
+    ps.apply_style()
+    panels = _model_panels(by_model)
+    fig = plt.figure(figsize=(11, 9.5))
+    gs_a = fig.add_gridspec(2, 2, top=0.88, bottom=0.47, hspace=0.35, wspace=0.08)
+    gs_b = fig.add_gridspec(1, len(panels), top=0.36, bottom=0.08, wspace=0.25)
+    ax_a = np.empty((2, 2), dtype=object)
+    for i in range(2):
+        for j in range(2):
+            ax_a[i, j] = fig.add_subplot(gs_a[i, j], sharex=ax_a[0, 0] if (i or j) else None,
+                                         sharey=ax_a[0, 0] if (i or j) else None)
+    for ax in ax_a[0]:
+        ax.tick_params(labelbottom=False)
+    for ax in ax_a[:, 1]:
+        ax.tick_params(labelleft=False)
+    _f2_hists(ax_a, a2, meta)
+    ax_b = [fig.add_subplot(gs_b[0, k]) for k in range(len(panels))]
+    _models_lines(ax_b, by_model, panels)
+    ax_a[0, 0].text(-0.12, 1.15, f"(a) {model}", transform=ax_a[0, 0].transAxes, fontsize=11, fontweight="bold")
+    ax_b[0].text(-0.12, 1.08, "(b) all models", transform=ax_b[0].transAxes, fontsize=11, fontweight="bold")
+    return _finish(fig, kind, f"(a) {model}, (b) several", layer, position, "F2 (A2): projection onto r_hat",
+                   "held-out pairs; r_hat fitted on vanilla TRAIN pairs; dashed line = midpoint of the train means; "
+                   "95% bootstrap CIs over pairs", path)
 
 
 # ------------------------------------------------------------------------------------------------ A5
@@ -265,7 +312,7 @@ def a5_pca_scatter(means, path, kind, model, layer, position="prompt[-1]"):
 
 
 def a5_principal_angles(angles, path, kind, model, layer, position="prompt[-1]"):
-    """Bar chart of the smallest principal angle between pairs of tactic subspaces. angles: {"A vs B": degrees}."""
+    """Bar chart of the smallest principal angle between pairs of tactic subspaces. angles: {A vs B: degrees}."""
     ps.apply_style()
     names = list(angles)
     fig, ax = plt.subplots(figsize=(max(7, 0.7 * len(names) + 3), 3.8))
@@ -396,6 +443,34 @@ def x5_dp_dotplot(stab, path, kind, model, layer, position="prompt[-1]"):
                    "r_hat refitted on each config's vanilla TRAIN pairs", path)
 
 
+# ------------------------------------------------------------------------------------------------ layer sweep
+def a2_layer_sweep(rows, path, kind, model, position="prompt[-1]"):
+    """A2 across layers (exploratory). rows: {layer label: geometry.a2_layer_row dict}, shallow to deep. Left: Cohen's
+    d of held-out dp (harmful, benign); right: share of test harmful prompts below the midpoint, adversarial vs vanilla."""
+    ps.apply_style()
+    labels = list(rows)
+    x = np.arange(len(labels))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 3.8))
+    for intent, ls in (("harmful", "-"), ("benign", "--")):
+        est, lo, hi = (np.array([rows[l]["d"][intent][k] for l in labels]) for k in range(3))
+        axes[0].errorbar(x, est, yerr=_ci_err(est, lo, hi), color=ps.INTENT_COLOR[intent], ls=ls, marker="o",
+                         capsize=4, label=f"{intent} pairs (95% CI)")
+    axes[0].axhline(0, color=ps.INK, lw=1)
+    axes[0].set(ylabel="Cohen's d of dp (scale-free)")
+    for key, color, ls, name in (("share_adv", ps.ORANGE, "-", "adversarial"), ("share_van", ps.MUTED, "--", "vanilla")):
+        est, lo, hi = (np.array([rows[l]["h1"][key][k] for l in labels]) for k in range(3))
+        axes[1].errorbar(x, est, yerr=_ci_err(est, lo, hi), color=color, ls=ls, marker="o", capsize=4,
+                         label=f"{name} harmful (95% CI)")
+    axes[1].axhline(0.5, color=ps.INK, lw=1, ls=":")
+    axes[1].set(ylabel="share below the midpoint (H1 line)", ylim=(0, 1))
+    for ax in axes:
+        ax.set_xticks(x, labels, fontsize=7.5)
+        ax.set(xlabel="layer (hidden_states index)")
+        ax.legend(fontsize=7)
+    return _finish(fig, kind, model, "sweep (x-axis)", position, "A2 across layers",
+                   "r_hat refitted per layer on vanilla TRAIN pairs; held-out pairs (d), test pairs (shares)", path)
+
+
 # ------------------------------------------------------------------------------------------------ summary + synthetic
 def ws3_summary(pngs, path, kind):
     """One page tiling the main figure of each analysis. pngs: {label: path}."""
@@ -454,7 +529,13 @@ def render_all_synthetic(folder):
            a8_spectrum(s, folder / "WS3_A8_spectrum_SYNTHETIC.png", **kw),
            a8_angle_arc(63.0, folder / "WS3_A8_angle_SYNTHETIC.png", **kw),
            x5_cosine_heatmap(table, folder / "WS3_X5_cosine_SYNTHETIC.png", kind="SYNTHETIC", layer="last"),
-           x5_dp_dotplot(stab, folder / "WS3_X5_dp_SYNTHETIC.png", **kw)]
+           x5_dp_dotplot(stab, folder / "WS3_X5_dp_SYNTHETIC.png", **kw),
+           f2_combined(a2, meta, by_model, folder / "WS3_F2_SYNTHETIC.png", **kw),
+           a2_layer_sweep({f"{l}": g.a2_layer_row(s_["Hv"], s_["Ha"], s_["meta"], n_boot=200)
+                           for l, s_ in ((0, g.synthetic_ws3(seed=7, style=0.0, content=-0.1)),
+                                         (8, g.synthetic_ws3(seed=7, style=-0.4, content=-0.6)),
+                                         (16, syn))},
+                          folder / "WS3_A2_layers_SYNTHETIC.png", kind="SYNTHETIC", model="synthetic")]
     out.append(ws3_summary({"A2 (F2)": out[5], "A5 cosine": out[8], "A7 style vs content": out[12],
                             "A8 spectrum": out[13], "X5 cosine": out[15]}, folder / "WS3_summary_SYNTHETIC.png", "SYNTHETIC"))
     return out

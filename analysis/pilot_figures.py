@@ -100,7 +100,7 @@ def draw_pilot_glance(pairs, path, kind="PILOT", model=MODEL):
     adv = pairs[pairs.role == "adversarial"]
     tcount = adv.groupby(["tactic", "intent"]).size().unstack(fill_value=0).reindex(columns=["harmful", "benign"], fill_value=0)
     tcount = tcount.loc[tcount.sum(axis=1).sort_values(ascending=False).index]
-    if len(tcount) > 12:  # fold the tail into "Other"
+    if len(tcount) > 12:  # fold the tail into Other
         tcount = pd.concat([tcount.iloc[:11], tcount.iloc[11:].sum().to_frame("Other").T])
     y = np.arange(len(tcount))[::-1]
     left = np.zeros(len(tcount))

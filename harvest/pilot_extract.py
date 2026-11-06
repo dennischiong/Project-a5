@@ -1,10 +1,10 @@
-"""Task 5: own pilot data. NEEDS A GPU (L4). Run only after the user says "go".
+"""Task 5: own pilot data. NEEDS A GPU (L4). Run only after the user says go.
 
 Prints ONLY ids, counts and numbers: never prompt text or model replies.
 Outputs (repo-relative):
   data/pairs_text.parquet            raw text (git-ignored)
   harvest/out/pairs.parquet          pairs table WITHOUT text
-  harvest/out/pilot_acts.safetensors prompt[-1] vector for every hidden_states entry, bf16, key "<pair_id>|<role>"
+  harvest/out/pilot_acts.safetensors prompt[-1] vector for every hidden_states entry, bf16, key <pair_id>|<role>
   harvest/out/pilot_acts_instr.safetensors  same, at the last token of the user instruction (Zhao et al. split)
   harvest/out/pilot_prenorm_last.safetensors  last layer output BEFORE the final norm, shape (1, hidden)
   harvest/out/pilot_nexttoken.parquet  top-20 next tokens and refusal/comply mass at prompt[-1] (ids and numbers)
@@ -14,8 +14,8 @@ Outputs (repo-relative):
 
 Where tactic labels come from (checked in this order, see tactics_source_for):
   1. data/tactics_map.parquet, if it exists (TACTIC_SOURCE hook, for when Dennis says where tactics come from);
-  2. the dataset's own "tactics" column, if it has one;
-  3. PILOT ONLY: --allow-missing-tactics sets every tactic to "unknown" and samples at random;
+  2. the dataset's own tactics column, if it has one;
+  3. PILOT ONLY: --allow-missing-tactics sets every tactic to unknown and samples at random;
   4. otherwise STOP, exactly as before.
 
 Flags:
@@ -50,10 +50,10 @@ REQUIRED_COLS = {"vanilla", "adversarial", TACTICS_COL, "data_type"}
 # ---- TACTIC_SOURCE hook ---------------------------------------------------------------------------------------------
 # When Dennis says where tactic labels come from, save them as data/tactics_map.parquet with two columns:
 #   <TACTICS_MAP_KEY>  the row key, matching the same column of the loaded dataset
-#   tactic             the tactic label: one string, or a list / "['a', 'b']" string (the first entry is used)
+#   tactic             the tactic label: one string, or a list / ['a', 'b'] string (the first entry is used)
 # The default key, source_row_id, is the 0-based data-row number in WildJailbreak train/train.tsv (header not
 # counted). It is the same number pairs.parquet stores in source_row_id. To join on another column, change
-# TACTICS_MAP_KEY here (the only place it is set). Rows the map does not cover get tactic "unknown".
+# TACTICS_MAP_KEY here (the only place it is set). Rows the map does not cover get tactic unknown.
 # TACTICS_MAP_PATH (set by Task 0 from team_inputs.json) points at the file when it lives somewhere else.
 TACTICS_MAP = Path(os.environ.get("TACTICS_MAP_PATH") or DATA / "tactics_map.parquet")
 TACTICS_MAP_KEY = "source_row_id"
@@ -78,7 +78,7 @@ def first_tactic(raw) -> str:
 
 
 def _tactic_value(v) -> str:
-    """One tactic label from a map cell: a string, a "['a', 'b']" string, or a list/array (first entry used)."""
+    """One tactic label from a map cell: a string, a ['a', 'b'] string, or a list/array (first entry used)."""
     if isinstance(v, (list, tuple, np.ndarray)):
         return first_tactic(v[0]) if len(v) else "unknown"
     return first_tactic(v)
@@ -189,9 +189,9 @@ def last_instruction_index(tok, prompt: str, user_text: str):
     return (max(idx) if idx else None), enc["input_ids"]
 
 
-# Kickoff extraction step 5: refusal-like vs compliance-like first tokens, using the kickoff's examples ("I", "Sorry"
-# vs "Sure", "Here") extended with the same lists as the Week 0 notebook. This is a CRUDE plumbing measure: "I" also
-# starts "I'd be happy to". [PROPOSED - confirm with mentor]; the real behaviour label comes from WildGuard.
+# Kickoff extraction step 5: refusal-like vs compliance-like first tokens, using the kickoff's examples (I, Sorry
+# vs Sure, Here) extended with the same lists as the Week 0 notebook. This is a CRUDE plumbing measure: I also
+# starts I'd be happy to. [PROPOSED - confirm with mentor]; the real behaviour label comes from WildGuard.
 REFUSAL_WORDS = ["I", "Sorry", "I'm sorry", "I cannot", "I can't", "I apologize", "Unfortunately", "As an AI"]
 COMPLY_WORDS = ["Sure", "Here", "Certainly", "Of course", "Absolutely", "Okay"]
 

@@ -30,7 +30,7 @@ from analysis import lib
 MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
 MODEL_TAG = "qwen25-1p5b"
 SOURCES = ("WildJailbreak", "SORRY-Bench")
-# SORRY-Bench mutation families (SORRY-Bench paper); the work plan puts encoded mutations in a "may not be understood"
+# SORRY-Bench mutation families (SORRY-Bench paper); the work plan puts encoded mutations in a may not be understood
 # bucket, and a 1.5B model may not understand low-resource translations either: both are flagged in every output.
 FAMILIES = {
     "encoded (may not be understood)": ("ascii", "atbash", "caesar", "morse"),
@@ -40,8 +40,8 @@ FAMILIES = {
                    "misrepresentation"),
 }
 FAMILY_OF = {t: f for f, ts in FAMILIES.items() for t in ts}
-# Next-token refusal / compliance proxy (same first words as the a5 pilot extraction; never confirmed by the mentor,
-# so everything built on it is EXPLORATORY and labelled "proxy").
+# Next-token refusal / compliance proxy (same first words as the a5 pilot extraction; a working choice,
+# so everything built on it is EXPLORATORY and labelled proxy).
 REFUSAL_WORDS = ("I", "Sorry", "As", "Unfortunately")
 COMPLIANCE_WORDS = ("Sure", "Certainly", "Here", "Absolutely")
 
@@ -64,7 +64,7 @@ def prompt_plan(pairs, sources=SOURCES):
     if missing:
         raise KeyError(f"pairs table lacks columns {sorted(missing)}")
     df = df.dropna(subset=["vanilla_prompt", "adversarial_prompt"])
-    # Pairs whose two prompts are identical (SORRY-Bench "base" and StrongREJECT "none" rows in pairs_table_v1_final-2)
+    # Pairs whose two prompts are identical (SORRY-Bench base and StrongREJECT none rows in pairs_table_v1_final-2)
     # have no displacement by construction: they would add zero vectors to every per-tactic analysis, so they go.
     df = df[df["vanilla_prompt"] != df["adversarial_prompt"]]
     df["key_v"] = df["vanilla_prompt"].map(prompt_key)
@@ -87,7 +87,7 @@ def keys_hash(keys):
 
 # ------------------------------------------------------------------------------------------------ loading
 def load(folder, view="prenorm"):
-    """Read the extraction folder. view: "prenorm" (pre-registered vector), "postnorm", or an int = a sweep layer
+    """Read the extraction folder. view: prenorm (pre-registered vector), postnorm, or an int = a sweep layer
     (hidden_states index, exploratory). Returns dict(H, prompts, pairs, meta, view)."""
     folder = Path(folder)
     meta = json.loads((folder / "meta.json").read_text())
@@ -246,8 +246,9 @@ def plot_tactic_masking(rows, wj, path, kind, model, layer, position="prompt[-1]
     a2.set(xlabel="share of adversarial prompts below the midpoint (H1 line)", xlim=(0, 1))
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in FAMILY_COLORS.values() if c in col]
     labels = [f for f, c in FAMILY_COLORS.items() if c in col]
+    # above the panel: inside it, the legend covers the longest bars (100% rows sit at the bottom)
     a2.legend(handles + a2.get_legend_handles_labels()[0], labels + ["same tactic's vanilla prompts"], fontsize=6.5,
-              loc="lower right")
+              loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=3)
     return F._finish(fig, kind, model, layer, position, "A2 per tactic (SORRY-Bench): masking along the WildJailbreak r_hat",
                      "held-out pairs; 95% bootstrap CIs over pairs (2000, seed 0); r_hat and midpoint from WildJailbreak vanilla TRAIN", path)
 
@@ -369,7 +370,7 @@ def run_all(folder, view="prenorm", fig_dir="figures/WS3/pilot", results_path=No
     s_ev = (ms["split"] != "train").to_numpy()
     rows = per_tactic_masking(Sv, Sa, ms, r_hat, mid, n_boot=n_boot, seed=seed)
     base_side = float(np.mean(lib.project(Sv, r_hat) > mid))
-    F.TITLE_NOTE = f"{kind}, EXPLORATORY"
+    F.TITLE_NOTE = "EXPLORATORY"   # the title already starts with the kind (tag)
     figs["A2_tactics_sorry"] = plot_tactic_masking(rows, a2["overall"]["harmful"], fig_dir / f"A2_tactics_sorry{tag}.png",
                                                    kind, model, layer, pos)
     res["A2_sorry_per_tactic"] = dict(n_pairs=len(ms), dropped_nonfinite=ms.attrs["dropped_nonfinite"],
@@ -404,7 +405,7 @@ def run_all(folder, view="prenorm", fig_dir="figures/WS3/pilot", results_path=No
     if refused is not None and refused[rows_tr].any() and (~refused[rows_tr]).any():
         rdir = lib.fit_direction(d["H"][rows_tr][refused[rows_tr]], d["H"][rows_tr][~refused[rows_tr]])
         angle = g.angle_between(r_hat, rdir)
-        F.TITLE_NOTE = f"{kind}, EXPLORATORY; refusal = next-token PROXY, not judge labels"
+        F.TITLE_NOTE = "EXPLORATORY; refusal = next-token PROXY, not judge labels"
         figs["A8_angle"] = F.a8_angle_arc(angle, fig_dir / f"A8_angle_proxy{tag}.png", kind, model, layer, pos)
     res["A8"] = dict(sorry=dict(effective_rank=g.effective_rank(s_all), directions_90=g.energy_rank(s_all, 0.9),
                                 singular_values_top50=s_all[:50]),

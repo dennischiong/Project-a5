@@ -3,22 +3,22 @@ folder format that analysis/ws3_pilot.run_all and analysis/regenerate_all read. 
 
 What the harvest holds (checked 28 Oct with Colab Notebooks/scratch/inspect_qwen7b_harvest.ipynb):
   <name>.tpxz      one shard: activations.safetensors (500 prompts per tensor, fp16) + index.parquet (prompt_id per row)
-  tensors          "last_prefill.layer_<0..27>" = decoder-layer output, pre final norm (metadata "residual_stream");
-                   "last_instruction.layer_<..>" (14 layers); "gen_<k>.layer_<..>" are invalid (max_new_tokens = 1)
-  pair_maps/pair_map__<table sha8>.parquet   pair_id, role ("vanilla" / "adv"), prompt_id
+  tensors          last_prefill.layer_<0..27> = decoder-layer output, pre final norm (metadata residual_stream);
+                   last_instruction.layer_<..> (14 layers); gen_<k>.layer_<..> are invalid (max_new_tokens = 1)
+  pair_maps/pair_map__<table sha8>.parquet   pair_id, role (vanilla / adv), prompt_id
 So layer 27 at last_prefill is the pre-registered vector (prompt[-1], last layer before the final norm). There is no
-post-norm vector and no next-token stats, so the folder has the "prenorm" view only and no refusal proxy (A8 angle).
+post-norm vector and no next-token stats, so the folder has the prenorm view only and no refusal proxy (A8 angle).
 
 Output folder (same files as harvest/ws3_pilot_extract.py, numbers only):
   prompts.parquet    prompt_key (= Dennis's prompt_id), n_tokens, refusal_mass / compliance_mass (NaN), finite
   pairs.parquet      pair_id, source, intent, tactic, split, holdout_group, row_v, row_a
   prenorm_last.npy   (prompts, hidden) float32
-  meta.json          model, model_tag, config "c6", serving config from the shard index, counts, table hash
+  meta.json          model, model_tag, config c6, serving config from the shard index, counts, table hash
 
 Standalone on purpose (numpy, pandas, safetensors, tar + pixz): it also runs pasted into a Colab cell of the Google
 account that can see the harvest, without the rest of the repo. Prints only ids, counts and numbers.
 
-    python harvest/dennis_harvest_convert.py --harvest "<folder>" --pairs <pairs_table_v1_final-2.csv> --out <folder>
+    python harvest/dennis_harvest_convert.py --harvest "<folder>" --pairs <pairs_table_v1_final-2.csv> --out <folder> [--sweep-every 4]
 """
 import argparse
 import hashlib
@@ -93,10 +93,24 @@ def read_shard(shard_dir, point=POINT, layer=LAYER):
     return rows, X, {**serving, **{k: meta[k] for k in ("residual_stream", "model", "transformers", "torch") if k in meta}}
 
 
+def sweep_layers(every, n_layers=N_LAYERS):
+    """Exploratory layer sweep in the hidden_states convention of harvest/ws3_harvest.py: index l = output of decoder
+    layer l (1-based), i.e. Dennis's layer_<l-1>. No embeddings (index 0) in the harvest; the last layer is the
+    prenorm view already. every <= 0: no sweep."""
+    return list(range(every, n_layers, every)) if every > 0 else []
+
+
+def read_sweep(shard_dir, layers, point=POINT):
+    """One restored shard -> (rows, len(layers), hidden) float16 at the sweep layers (hidden_states indices)."""
+    from safetensors import safe_open
+    with safe_open(str(Path(shard_dir) / "activations.safetensors"), framework="np") as f:
+        return np.stack([np.asarray(f.get_tensor(f"{point}.layer_{l - 1}"), np.float16) for l in layers], axis=1)
+
+
 def plan_pairs(pair_map, table, sources):
     """Pairs table (ids and labels only) + pair map -> one row per usable pair with prompt_v / prompt_a, and counts.
     Dropped: pairs not in the map or missing a role, and pairs whose two prompts are the same prompt (e.g. the
-    SORRY-Bench "base" rows: no displacement by construction)."""
+    SORRY-Bench base rows: no displacement by construction)."""
     t = table[table["source"].isin(sources)][TABLE_COLS].copy()
     for c in TABLE_COLS:
         t[c] = t[c].fillna("").astype(str)
@@ -112,14 +126,20 @@ def plan_pairs(pair_map, table, sources):
 
 
 def build_folder(plan, shards, out_dir, meta):
-    """plan (from plan_pairs) + shards [(rows DataFrame, vectors)] -> the WS3 extraction folder. Pairs with a prompt
-    that no shard holds are dropped and counted. Returns the meta dict written to meta.json."""
+    """plan (from plan_pairs) + shards [(rows DataFrame, vectors) or (rows, vectors, sweep)] -> the WS3 extraction
+    folder; sweep.npy is written when every shard has a sweep (meta[sweep_layers] names its layers). Pairs with a
+    prompt that no shard holds are dropped and counted. Returns the meta dict written to meta.json."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    rows = pd.concat([r for r, _ in shards], ignore_index=True) if shards else pd.DataFrame(columns=["prompt_id"])
-    X = np.concatenate([x for _, x in shards]) if shards else np.zeros((0, 0), np.float32)
-    first = ~rows["prompt_id"].duplicated()            # a prompt harvested twice keeps its first copy
-    rows, X = rows[first.to_numpy()].reset_index(drop=True), X[first.to_numpy()]
+    rows = pd.concat([s[0] for s in shards], ignore_index=True) if shards else pd.DataFrame(columns=["prompt_id"])
+    X = np.concatenate([s[1] for s in shards]) if shards else np.zeros((0, 0), np.float32)
+    S = np.concatenate([s[2] for s in shards]) if shards and all(len(s) == 3 for s in shards) else None
+    first = (~rows["prompt_id"].duplicated()).to_numpy()   # a prompt harvested twice keeps its first copy
+    rows, X = rows[first].reset_index(drop=True), X[first]
+    if S is not None:
+        S = S[first]
+        # like ws3_harvest: a prompt with a non-finite sweep vector is marked non-finite rather than clipped
+        rows["finite"] = rows["finite"].to_numpy(bool) & np.isfinite(S).all(axis=(1, 2))
     have = set(rows["prompt_id"])
     keep = plan["prompt_v"].isin(have) & plan["prompt_a"].isin(have)
     plan = plan[keep].reset_index(drop=True)
@@ -135,6 +155,8 @@ def build_folder(plan, shards, out_dir, meta):
     prompts.to_parquet(out / "prompts.parquet", index=False)
     pairs.to_parquet(out / "pairs.parquet", index=False)
     np.save(out / "prenorm_last.npy", H)
+    if S is not None:
+        np.save(out / "sweep.npy", S[take])
     meta = dict(meta, n_prompts=len(used), n_pairs=pairs["source"].value_counts().to_dict(),
                 dropped_prompt_not_harvested=int((~keep).sum()), n_nonfinite=int((~prompts["finite"]).sum()),
                 hidden_size=int(H.shape[1]) if H.size else 0)
@@ -142,8 +164,9 @@ def build_folder(plan, shards, out_dir, meta):
     return meta
 
 
-def main(harvest, pairs_csv, out_dir, datasets=tuple(DATASETS), work_root="/content/dennis_restore"):
+def main(harvest, pairs_csv, out_dir, datasets=tuple(DATASETS), work_root="/content/dennis_restore", sweep_every=0):
     harvest = Path(harvest)
+    layers = sweep_layers(sweep_every)
     archives = sorted(a for a in harvest.glob("*.tpxz") if archive_dataset(a.name) in datasets)
     pm_files = sorted((harvest / "pair_maps").glob("*.parquet"))
     if not archives or not pm_files:
@@ -159,13 +182,14 @@ def main(harvest, pairs_csv, out_dir, datasets=tuple(DATASETS), work_root="/cont
     Path(work_root).mkdir(parents=True, exist_ok=True)
     for i, a in enumerate(archives, 1):
         with tempfile.TemporaryDirectory(dir=work_root) as work:
-            rows, X, serving = read_shard(restore_archive(a, work))
-        shards.append((rows, X))
+            shard_dir = restore_archive(a, work)
+            rows, X, serving = read_shard(shard_dir)
+            shards.append((rows, X, read_sweep(shard_dir, layers)) if layers else (rows, X))
         print(f"  [{i}/{len(archives)}] {archive_dataset(a.name)}: {len(rows)} prompts, {int((~rows['finite']).sum())} "
               f"not finite ({time.time() - t0:.0f} s)")
     meta = dict(model=MODEL_ID, model_tag=MODEL_TAG, config="c6", config_name=archives[0].name.split("__")[2],
                 num_hidden_layers=N_LAYERS, point=POINT, layer=LAYER, position="prompt[-1]", views=["prenorm"],
-                sweep_layers=[], prenorm=serving.get("residual_stream", "decoder-layer output, pre final norm"),
+                sweep_layers=layers, prenorm=serving.get("residual_stream", "decoder-layer output, pre final norm"),
                 postnorm="not stored", refusal_proxy="not stored (no next-token stats in the harvest)",
                 serving=serving, source=f"Dennis's harvest, {len(archives)} archives ({', '.join(datasets)})",
                 pairs_table=str(pairs_csv), pairs_table_sha8=table_sha8, pair_counts=counts,
@@ -182,5 +206,7 @@ if __name__ == "__main__":
     ap.add_argument("--pairs", required=True, help="pairs_table_v1_final-2.csv (only id/label columns are read)")
     ap.add_argument("--out", required=True)
     ap.add_argument("--datasets", default="wildjailbreak,sorry-bench")
+    ap.add_argument("--sweep-every", type=int, default=0,
+                    help="also write sweep.npy (float16) at every Nth hidden_states layer (4 gives 4, 8, ..., 24; about 0.5 GB for Qwen-7B); 0 = off")
     a = ap.parse_args()
-    main(a.harvest, a.pairs, a.out, tuple(a.datasets.split(",")))
+    main(a.harvest, a.pairs, a.out, tuple(a.datasets.split(",")), sweep_every=a.sweep_every)

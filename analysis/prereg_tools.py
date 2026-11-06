@@ -1,4 +1,4 @@
-"""Pre-registration tools (Task 4): mentor questions, the lock, and the "changed after lock" check.
+"""Pre-registration tools (Task 4): mentor questions, the lock, and the changed after lock check.
 
   find_proposed(text)     every [PROPOSED - confirm with mentor] item in prereg.md, with its hypotheses
   questions_markdown()    numbered table: hypothesis | what is proposed | why it matters (-> prereg_questions.md)
@@ -164,7 +164,7 @@ def sha256_file(path):
 
 def lock_state(repo=None):
     """LOCKED when prereg.md matches the lock's sha256 or a recorded amendment (see record_amendment); the original
-    lock date and hash are always reported, and "amended" names the amendment the current file matches."""
+    lock date and hash are always reported, and amended names the amendment the current file matches."""
     repo = Path(repo or REPO)
     pp, lp = repo / "prereg.md", repo / "prereg_lock.json"
     cur = sha256_file(pp) if pp.exists() else None

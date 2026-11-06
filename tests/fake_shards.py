@@ -1,7 +1,7 @@
 """SYNTHETIC Undercurrent-style harvest shards for tests and chart previews: random numbers, never text.
 
 Follows the format assumed in lib.EXPECTED_SCHEMA (work plan s.6.1 / s.6.6): shard_00000.safetensors with one
-(prompts, hidden) tensor per "<point>/layer_<n>", plus shard_00000.parquet with the index columns. bf16 when torch
+(prompts, hidden) tensor per <point>/layer_<n>, plus shard_00000.parquet with the index columns. bf16 when torch
 is installed (as in Colab), float32 otherwise.
 """
 from pathlib import Path
@@ -18,7 +18,7 @@ def point_layers(n_layers):
 
 def make_fake_harvest(folder, n_shards=2, prompts_per_shard=6, n_layers=8, hidden=16, seed=0, pair_ids=None,
                       nan_at=None, truncate_rows=(), dtype="auto"):
-    """Write a synthetic harvest. pair_ids: list of pair ids; prompt ids are "<pair_id>|<role>" (vanilla, adversarial
+    """Write a synthetic harvest. pair_ids: list of pair ids; prompt ids are <pair_id>|<role> (vanilla, adversarial
     alternating). nan_at: (point, layer) to plant one NaN in shard 0. Returns the list of prompt ids in order."""
     rng = np.random.default_rng(seed)
     folder = Path(folder)

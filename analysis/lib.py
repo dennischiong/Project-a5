@@ -2,10 +2,10 @@
 
 Conventions
 -----------
-* A *pairs table* has one row per (pair_id, role). role is "vanilla" or "adversarial".
-  Columns: pair_id, source, role, intent ("harmful"/"benign"), tactic, token_count, split,
+* A *pairs table* has one row per (pair_id, role). role is vanilla or adversarial.
+  Columns: pair_id, source, role, intent (harmful/benign), tactic, token_count, split,
   source_row_id, and (only in git-ignored data/) text.
-* Activations are stored as safetensors, one tensor per key "<pair_id>|<role>", shape
+* Activations are stored as safetensors, one tensor per key <pair_id>|<role>, shape
   (n_layers + 1, hidden): the prompt[-1] vector for every entry of ``hidden_states``.
 * Nothing here prints or returns raw prompt text.
 """
@@ -176,7 +176,7 @@ def cohens_d(a: np.ndarray, b: Optional[np.ndarray] = None) -> float:
 
 
 def auroc_per_group(y, score, groups, min_per_class: int = 3) -> Dict[str, float]:
-    """AUROC within each group; NaN ("n/a") unless both classes have >= min_per_class members."""
+    """AUROC within each group; NaN (n/a) unless both classes have >= min_per_class members."""
     from sklearn.metrics import roc_auc_score
 
     y, score, groups = np.asarray(y), np.asarray(score), np.asarray(groups)
@@ -192,9 +192,9 @@ def auroc_per_group(y, score, groups, min_per_class: int = 3) -> Dict[str, float
 def validate_pairs(df: pd.DataFrame, check_text: bool = True, allow_unknown_tactics: bool = False) -> None:
     """Raise ValueError describing every problem found. Never echoes text content.
 
-    Fails if: an adversarial row has empty/NaN/"None" text; an adversarial token_count <= 1;
+    Fails if: an adversarial row has empty/NaN/None text; an adversarial token_count <= 1;
     a pair_id lacks exactly one vanilla and one adversarial row; duplicate (pair_id, role);
-    or ALL harmful adversarial rows have tactic "unknown" (skipped only when allow_unknown_tactics=True, which
+    or ALL harmful adversarial rows have tactic unknown (skipped only when allow_unknown_tactics=True, which
     the pilot sets under its --allow-missing-tactics override).
     """
     problems = []
@@ -239,7 +239,7 @@ def validate_pairs(df: pd.DataFrame, check_text: bool = True, allow_unknown_tact
 EXPECTED_SCHEMA = {
     "shard_glob": "*.safetensors",            # shard files (searched in sub-folders too)
     "index_suffix": ".parquet",               # the index of shard_00000.safetensors is shard_00000.parquet
-    "tensor_key_regex": r"^(?P<point>[A-Za-z0-9_]+)/layer_(?P<layer>\d+)$",  # assumed key "<point>/layer_<n>"
+    "tensor_key_regex": r"^(?P<point>[A-Za-z0-9_]+)/layer_(?P<layer>\d+)$",  # assumed key <point>/layer_<n>
     "tensor_key_example": "last_prefill/layer_31",  # each tensor: (prompts in the shard, hidden), rows = index rows
     "dtype": "bfloat16",
     "prompts_per_shard": 500,
@@ -249,7 +249,7 @@ EXPECTED_SCHEMA = {
                       "undercurrent_version", "template_hash"],
     "id_column": "prompt_id",
     # join to the pairs table: harvest prompt_id == pairs prompt_id; if the pairs table has no prompt_id column it is
-    # built as "<pair_id>|<role>" (the pilot's key). Change "pairs_key" to e.g. "source_row_id" if that is the link.
+    # built as <pair_id>|<role> (the pilot's key). Change pairs_key to e.g. source_row_id if that is the link.
     "join": {"index_key": "prompt_id", "pairs_key": "prompt_id"},
 }
 
@@ -297,8 +297,8 @@ def load_harvest(shard_dir, point="last_prefill", layers=None, schema=None):
     """Read every shard under ``shard_dir`` for one extraction point.
 
     Returns (activations, index): activations is float32 (prompts, layers, hidden) and row i belongs to the prompt
-    in index row i (index[id_column] is unique). index.attrs["layers"] lists the layer numbers of axis 1 and
-    index.attrs["point"] the point. ``layers`` (a list) keeps only those layers; a missing one raises KeyError.
+    in index row i (index[id_column] is unique). index.attrs[layers] lists the layer numbers of axis 1 and
+    index.attrs[point] the point. ``layers`` (a list) keeps only those layers; a missing one raises KeyError.
     Raises FileNotFoundError / ValueError with a plain message if the format does not match EXPECTED_SCHEMA.
     """
     from safetensors import safe_open

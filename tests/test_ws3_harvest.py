@@ -83,5 +83,6 @@ def test_size_estimate_and_names():
     assert wh.out_name("mistral-7b", "c6", 4000, 0) == "mistral-7b__wj-sorry__hf-nf4-bs1__sub4000"
     assert wh.out_name("gemma2-9b", "c1", 0, 20) == "gemma2-9b__wj-sorry__hf-bf16-bs1__smoke20"
     assert wh.out_name("qwen25-1p5b", "c1", 0, 0, "float16") == "qwen25-1p5b__wj-sorry__hf-fp16-bs1"
-    assert set(wh.MODELS) >= {"gemma2-9b", "mistral-7b"}
+    assert set(wh.MODELS) >= {"gemma2-9b", "mistral-7b", "qwen25-7b"}
+    assert wh.out_name("qwen25-7b", "c6", 4000, 0) == "qwen25-7b__wj-sorry__hf-nf4-bs1__sub4000"
     assert wh.MODELS["gemma2-9b"]["fp16_ok"] is False            # Gemma in fp16 overflows (work plan s.6.6)

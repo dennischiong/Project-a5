@@ -1,13 +1,16 @@
-"""Regenerate every WS3 figure and numbers file from one script (work plan s.8: "every figure regenerates from one
-script"). CPU only; reads the extraction folders on Drive, never prompt text.
+"""Regenerate every WS3 figure and numbers file from one script (work plan s.8: every figure regenerates from one
+script). CPU only; reads the extraction folders on Drive, never prompt text.
 
 What it does, in order (each step is skipped with a printed reason when its data is missing):
   1  diagrams + synthetic previews of every figure function    -> figures/_previews/, figures/_contact_sheet.png
   2  Task 6 pilot (harvest/out, 100 pairs)                      -> analysis/pilot_analysis.main()
   3  every real extraction folder (ws3_pilot/*, ws3_harvest/*; smoke tests skipped), views prenorm + postnorm
                                                                 -> figures/WS3/<folder>/, results/WS3_<folder>_<view>.json
-  4  A2 across models (full c1 folders + the Qwen-1.5B pilot)   -> figures/WS3/A2_models.png, results/WS3_A2_models.json
+  4  A2 across models (one folder per model: full C1 if any, else the best other config, labelled; Cohen's d)
+                                                                -> figures/WS3/A2_models.png, figures/WS3/F2.png (paper F2), results/WS3_A2_models.json
   5  X5 per model: C6 (NF4) against C1 (HF bf16) on the same pairs -> figures/WS3/X5_*.png, results/WS3_X5.json
+  5b A2 across layers (exploratory), every folder with a layer sweep: sweep layers + the last layer pre-norm
+                                                                -> figures/WS3/<folder>/A2_layers.png, results/WS3_layer_sweep.json
   6  contact sheet of the real figures                          -> figures/WS3/_real_contact_sheet.png
 
     python analysis/regenerate_all.py [--data-root $A5_WORK_ROOT] [--skip-previews] [--n-boot 2000]
@@ -27,6 +30,7 @@ from seeds import set_seed  # noqa: E402
 DATA_ROOT = os.environ.get("A5_WORK_ROOT", "/content/drive/MyDrive/a5-work")   # holds ws3_pilot/ and ws3_harvest/
 REFERENCE = "C1 HF bf16 bs1"
 CONFIG_LABEL = {"c1": REFERENCE, "c6": "C6 NF4 4-bit"}
+F2_MODEL = "qwen25-7b"  # panel (a) of the paper figure F2; else the first non-pilot model
 
 
 def find_folders(data_root):
@@ -98,33 +102,76 @@ def step_folders(folders, n_boot):
     return made
 
 
+def folder_rank(info):
+    """Which folder speaks for a model in A2 across models: full C1 first, then full C6, then subset runs."""
+    return (bool(info["subset"]), info["config"] != "c1")
+
+
+def pick_model_folders(folders):
+    """One folder per model tag. Returns ({tag: folder}, same_config): same_config is True when every model is a
+    full C1 run in the same precision (the clean comparison); otherwise the configs are mixed and every label must name its config.
+    Ties go to the later folder in the list (find_folders puts ws3_harvest, the final pairs table, after ws3_pilot)."""
+    best = {}
+    for f in folders:
+        info = folder_info(f)
+        if info["tag"] not in best or folder_rank(info) <= folder_rank(best[info["tag"]][1]):
+            best[info["tag"]] = (f, info)
+    same = (all(folder_rank(i) == (False, False) for _, i in best.values())
+            and len({i["meta"].get("config_name", i["config"]) for _, i in best.values()}) == 1)
+    return {t: f for t, (f, _) in best.items()}, same
+
+
+def figure_kind(any_pilot):
+    """Title kind of a figure that pools folders: PILOT as soon as one of them is the plumbing-scale pilot model
+    (ws3_pilot.run_labels labels every Qwen2.5-1.5B run PILOT), else RESULT."""
+    return "PILOT" if any_pilot else "RESULT"
+
+
+def model_label(info, same_config):
+    label = info["tag"] + (" (pilot)" if info["pilot"] else "")
+    if not same_config:
+        label += f"\n{info['meta'].get('config_name', info['config'])}" + (f", sub{info['subset']}" if info["subset"] else "")
+    return label
+
+
 def step_models(folders, n_boot):
     from analysis import figures as F
     from analysis import geometry as g
+    from analysis import lib
     from analysis import ws3_data
     from analysis import ws3_pilot as wp
-    # one full C1 folder per model; a ws3_harvest folder (final pairs table) replaces the older ws3_pilot run
-    by_tag = {}
-    for f in folders:
-        if folder_info(f)["config"] == "c1" and not folder_info(f)["subset"]:
-            by_tag[folder_info(f)["tag"]] = f
-    full = list(by_tag.values())
-    if len(full) < 2:
-        print(f"[4] skipped: A2 across models needs 2+ full c1 folders, found {len(full)}")
+    chosen, same = pick_model_folders(folders)
+    if len(chosen) < 2:
+        print(f"[4] skipped: A2 across models needs 2+ models, found {len(chosen)}")
         return []
-    by_model, pilot = {}, False
-    for f in full:
+    by_model, out, pilot, f2 = {}, {}, False, None
+    for tag, f in chosen.items():
         info = folder_info(f)
         Hv, Ha, m = wp.pair_arrays(wp.load(f, "prenorm"), "WildJailbreak")
-        label = info["tag"] + (" (pilot)" if info["pilot"] else "")
+        a2 = g.a2_projection(Hv, Ha, m, n_boot=n_boot)
+        ev = (m["split"] != "train").to_numpy()
+        harm = (m["intent"] == "harmful").to_numpy()
+        # dp is in each model's own units: Cohen's d (mean / SD of held-out dp) is what compares across models
+        a2["d"] = {i: lib.bootstrap_ci(a2["dp"][ev & (harm if i == "harmful" else ~harm)], lib.cohens_d, n=n_boot)
+                   for i in ("harmful", "benign")}
         pilot |= info["pilot"]
-        by_model[label] = g.a2_projection(Hv, Ha, m, n_boot=n_boot)
-    kind = "PILOT + HARVEST" if pilot else "RESULT"
-    p = F.a2_models_line(by_model, REPO / "figures" / "WS3" / "A2_models.png", kind=kind, layer="last, pre-norm")
-    ws3_data.save_json({m: dict(overall=a["overall"], midpoint=a["midpoint"]) for m, a in by_model.items()},
-                       REPO / "results" / "WS3_A2_models.json")
-    print(f"[4] A2 across {len(by_model)} models -> {p}")
-    return [p]
+        by_model[model_label(info, same)] = a2
+        if tag == F2_MODEL or (f2 is None and not info["pilot"]):
+            f2 = (a2, m, model_label(info, same))
+        out[tag] = dict(folder=f.name, config=info["meta"].get("config_name", info["config"]), subset=info["subset"],
+                        n_pairs=len(m), overall=a2["overall"], cohens_d=a2["d"], midpoint=a2["midpoint"])
+    kind = figure_kind(pilot)
+    notes = ([] if same else ["MIXED SERVING CONFIGS: compare by Cohen's d"]) + (["includes the Qwen2.5-1.5B pilot"] if pilot else [])
+    F.TITLE_NOTE = "; ".join(notes) or None
+    made = [F.a2_models_line(by_model, REPO / "figures" / "WS3" / "A2_models.png", kind=kind, layer="last, pre-norm")]
+    if f2 is not None:
+        made.append(F.f2_combined(*f2[:2], by_model, REPO / "figures" / "WS3" / "F2.png", kind=kind, model=f2[2],
+                                  layer="last, pre-norm"))
+    F.TITLE_NOTE = None
+    out["same_config"] = same
+    ws3_data.save_json(out, REPO / "results" / "WS3_A2_models.json")
+    print(f"[4] A2 across {len(by_model)} models ({'all full C1' if same else 'mixed configs'}) -> {', '.join(map(str, made))}")
+    return made
 
 
 def step_x5(folders, n_boot):
@@ -148,16 +195,60 @@ def step_x5(folders, n_boot):
         table[tag] = {c: v["cos_to_reference"] for c, v in stab.items()}
         out[tag] = {c: dict(cos_to_reference=v["cos_to_reference"], dp=v["dp"]) for c, v in stab.items()}
         out[tag]["n_pairs"] = len(meta)
-        made.append(F.x5_dp_dotplot(stab, REPO / "figures" / "WS3" / f"X5_dp_{tag}.png", kind="RESULT", model=tag,
-                                    layer="last, pre-norm"))
+        made.append(F.x5_dp_dotplot(stab, REPO / "figures" / "WS3" / f"X5_dp_{tag}.png", kind=figure_kind(c6i["pilot"]),
+                                    model=tag, layer="last, pre-norm"))
     if not table:
         print("[5] skipped: X5 needs a c1 and a c6 folder for the same model")
         return made
-    made.append(F.x5_cosine_heatmap(table, REPO / "figures" / "WS3" / "X5_cosine.png", kind="RESULT",
+    made.append(F.x5_cosine_heatmap(table, REPO / "figures" / "WS3" / "X5_cosine.png",
+                                    kind=figure_kind(any(folder_info(f)["pilot"] for f in folders
+                                                         if folder_info(f)["tag"] in table)),
                                     layer="last, pre-norm"))
     out["reference"] = f"{REFERENCE} (no vLLM R in the WS3 pipeline)"
     ws3_data.save_json(out, REPO / "results" / "WS3_X5.json")
     print(f"[5] X5 for {sorted(table)}: " + ", ".join(f"{t} cos {v[CONFIG_LABEL['c6']]:.4f}" for t, v in table.items()))
+    return made
+
+
+def sweep_views(meta):
+    """Views of the layer sweep, shallow to deep, as (view, x label): every sweep layer (hidden_states index), then
+    the last layer pre-norm. Empty when the folder has fewer than 2 sweep layers (nothing to sweep over)."""
+    n = meta.get("num_hidden_layers")
+    # hidden_states[n] is the post-norm output, not a sweep point. hidden_states[0] at prompt[-1] is the embedding of
+    # the chat template's last token, the same vector in every prompt, so no r_hat can be fitted there.
+    layers = [l for l in sorted(int(l) for l in meta.get("sweep_layers") or []) if l > 0 and (n is None or l < n)]
+    if len(layers) < 2:
+        return []
+    return [(l, str(l)) for l in layers] + [("prenorm", f"{n} (last, pre-norm)")]
+
+
+def step_sweep(folders, n_boot):
+    from analysis import figures as F
+    from analysis import geometry as g
+    from analysis import ws3_data
+    from analysis import ws3_pilot as wp
+    out, made = {}, []
+    for f in folders:
+        info = folder_info(f)
+        views = sweep_views(info["meta"])
+        if not views:
+            continue
+        rows = {}
+        for view, label in views:
+            Hv, Ha, m = wp.pair_arrays(wp.load(f, view), "WildJailbreak")
+            rows[label] = g.a2_layer_row(Hv, Ha, m, n_boot=n_boot)
+        F.TITLE_NOTE = "EXPLORATORY (layer sweep, not pre-registered)"
+        model = f"{info['tag']} [{info['meta'].get('config_name', info['config'])}]"
+        made.append(F.a2_layer_sweep(rows, REPO / "figures" / "WS3" / f.name / "A2_layers.png",
+                                     kind=figure_kind(info["pilot"]), model=model))
+        F.TITLE_NOTE = None
+        out[f.name] = dict(n_pairs=len(m), layers=rows)
+        print(f"[5b] {f.name}: " + ", ".join(f"{l} d {r['d']['harmful'][0]:+.2f}/{r['d']['benign'][0]:+.2f}"
+                                             for l, r in rows.items()))
+    if not out:
+        print("[5b] skipped: no folder has a layer sweep of 2+ layers")
+        return made
+    ws3_data.save_json(out, REPO / "results" / "WS3_layer_sweep.json")
     return made
 
 
@@ -185,6 +276,7 @@ def main():
     made = step_folders(folders, a.n_boot)
     made += step_models(folders, a.n_boot)
     made += step_x5(folders, a.n_boot)
+    made += step_sweep(folders, a.n_boot)
     if made:
         from analysis import contact_sheet as cs
         p = cs.contact_sheet(made, REPO / "figures" / "WS3" / "_real_contact_sheet.png", what="real data")

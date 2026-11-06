@@ -55,7 +55,7 @@ def test_parser_on_a_draft():
     by = {(tuple(it["hypotheses"]), it["proposed"]) for it in items if not it["general"]}
     assert (("H3",), "0.8") in by and (("H5",), "0.05") in by and (("H7",), "0.01") in by
     holm = [it for it in items if it["proposed"].startswith("Holm")]
-    assert holm and holm[0]["hypotheses"] == pt.HYPS        # "H1-H7" is expanded
+    assert holm and holm[0]["hypotheses"] == pt.HYPS        # H1-H7 is expanded
     norm = [it for it in items if "norm" in it["proposed"].lower()][0]
     assert norm["hypotheses"] == ["H1", "H2", "H3", "H6"]
     assert all(it["why"] for it in items)

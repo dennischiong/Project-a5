@@ -107,7 +107,7 @@ def main():
         end = start + len(PROBE)
         last_instr = max(i for i, (s0, e0) in enumerate(offs) if e0 > s0 and s0 < end)  # last token starting inside the sentence
         row["n_tokens_probe"] = n
-        # Llama-3.1's template inserts a date line ("Today Date: ..."), so token counts can change by day; record it.
+        # Llama-3.1's template inserts a date line (Today Date: ...), so token counts can change by day; record it.
         row["template_inserts_date"] = "Today Date:" in text
         row["run_date_utc"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         row["last_instruction_token_index_from_end"] = last_instr - n  # e.g. -6
@@ -130,7 +130,7 @@ def main():
     plot_offsets(df)
 
 
-# Work plan section 5 table, "Last-instruction position (verify W3)"
+# Work plan section 5 table, Last-instruction position (verify W3)
 TEAM_ESTIMATE = {
     "Qwen/Qwen2.5-1.5B-Instruct": -6, "Qwen/Qwen2.5-7B-Instruct": -6, "meta-llama/Llama-3.1-8B-Instruct": -6,
     "google/gemma-2-9b-it": -6, "mistralai/Mistral-7B-Instruct-v0.3": -2,

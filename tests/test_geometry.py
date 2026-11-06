@@ -138,3 +138,13 @@ def test_ws3_figures_draw(tmp_path):
     assert len(paths) >= 18
     for p in paths:
         assert p.exists() and p.stat().st_size > 5_000, p
+
+
+def test_a2_layer_row_recovers_planted_moves():
+    syn = g.synthetic_ws3(n_pairs=400)                       # harmful move -2.0u, benign -0.8u
+    row = g.a2_layer_row(syn["Hv"], syn["Ha"], syn["meta"], n_boot=200)
+    assert row["d"]["harmful"][2] < 0 and row["d"]["benign"][2] < 0
+    assert row["mean_dp"]["harmful"][0] < row["mean_dp"]["benign"][0]
+    h1 = row["h1"]
+    assert h1["n"] > 0 and h1["share_adv"][0] >= h1["share_van"][0]
+    assert np.isclose(h1["diff"][0], h1["share_adv"][0] - h1["share_van"][0])

@@ -3,7 +3,7 @@
 Shapes used everywhere:
   Hv, Ha   (pairs, hidden)  hidden state of the vanilla and the adversarial prompt of each pair, at ONE layer/position
   delta    (pairs, hidden)  Ha - Hv, how far the rewrite moved the pair's hidden state
-  meta     DataFrame, one row per pair, columns intent ("harmful"/"benign"), tactic, split ("train"/...)
+  meta     DataFrame, one row per pair, columns intent (harmful/benign), tactic, split (train/...)
 Fitting always uses TRAIN pairs only; numbers are reported on held-out (validation + test) pairs.
 """
 import numpy as np
@@ -17,7 +17,7 @@ def a2_projection(Hv, Ha, meta, n_boot=2000, seed=0):
     """A2: the harmfulness direction r_hat and how far each rewrite moves along it.
 
     In words: average the vanilla harmful prompts and the vanilla benign prompts (TRAIN only); the arrow from the
-    benign average to the harmful average, scaled to length 1, is r_hat ("which way is more harmful"). Each pair's
+    benign average to the harmful average, scaled to length 1, is r_hat (which way is more harmful). Each pair's
     dp is the shadow of its displacement on that arrow: dp = (h_adv - h_van) . r_hat. dp < 0 means the rewrite made
     the prompt look LESS harmful to the model. The midpoint between the two TRAIN averages (projected on r_hat) is
     the H1 line.
@@ -45,6 +45,25 @@ def a2_projection(Hv, Ha, meta, n_boot=2000, seed=0):
             row[intent] = (*lib.bootstrap_ci(v, np.mean, n=n_boot, seed=seed), len(v)) if len(v) >= 2 else (np.nan, np.nan, np.nan, len(v))
         out["per_tactic"][t] = row
     return out
+
+
+def a2_layer_row(Hv, Ha, meta, n_boot=2000, seed=0):
+    """A2 at one layer of the exploratory layer sweep: r_hat refitted on that layer's vanilla TRAIN pairs.
+
+    In words: dp is in each layer's own units (the hidden state grows with depth), so layers are compared by Cohen's
+    d of the held-out dp; plus the H1 shares on test harmful pairs (adversarial and vanilla below the midpoint).
+    Returns dict(d {intent: (d, lo, hi)}, mean_dp {intent: (mean, lo, hi)}, h1 {n, share_adv, share_van, diff})."""
+    a2 = a2_projection(Hv, Ha, meta, n_boot=n_boot, seed=seed)
+    ev = (meta["split"] != "train").to_numpy()
+    harm = (meta["intent"] == "harmful").to_numpy()
+    d = {i: lib.bootstrap_ci(a2["dp"][ev & m], lib.cohens_d, n=n_boot, seed=seed)
+         for i, m in (("harmful", harm), ("benign", ~harm))}
+    te = (meta["split"] == "test").to_numpy() & harm
+    adv = (a2["pa"][te] < a2["midpoint"]).astype(float)
+    van = (a2["pv"][te] < a2["midpoint"]).astype(float)
+    h1 = dict(n=int(te.sum()), **{k: lib.bootstrap_ci(v, np.mean, n=n_boot, seed=seed) if len(v) else (np.nan,) * 3
+                                  for k, v in (("share_adv", adv), ("share_van", van), ("diff", adv - van))})
+    return dict(d=d, mean_dp=a2["overall"], h1=h1)
 
 
 # ------------------------------------------------------------------------------------------------ A5
@@ -145,7 +164,7 @@ def style_content(dp, tactics, intents, n_boot=2000, seed=0):
     95% CIs: bootstrap that resamples harmful and benign pairs separately within the tactic.
 
     Returns {tactic: dict(style=(est, lo, hi), content=(est, lo, hi), n_harmful, n_benign)} for tactics with at least
-    2 pairs of each intent, plus "_pooled" = the same averaged over those tactics (resampling within each tactic).
+    2 pairs of each intent, plus _pooled = the same averaged over those tactics (resampling within each tactic).
     """
     dp = np.asarray(dp, float)
     tac = np.asarray(tactics).astype(str)

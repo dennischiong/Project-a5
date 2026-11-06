@@ -99,7 +99,7 @@ def fig_data_overview(pairs, meta):
     adv = pairs[pairs.role == "adversarial"]
     counts = adv.groupby(["tactic", "intent"]).size().unstack(fill_value=0).reindex(columns=["harmful", "benign"], fill_value=0)
     counts = counts.loc[counts.sum(axis=1).sort_values(ascending=False).index]
-    if len(counts) > 12:  # fold the tail into "Other" instead of inventing more colours or rows
+    if len(counts) > 12:  # fold the tail into Other instead of inventing more colours or rows
         counts = pd.concat([counts.iloc[:11], counts.iloc[11:].sum().to_frame("Other").T])
     y = np.arange(len(counts))[::-1]
     left = np.zeros(len(counts))

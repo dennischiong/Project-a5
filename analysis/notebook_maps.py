@@ -1,6 +1,6 @@
 """Notebook maps: pictures that show how each notebook is put together (no data in them).
 
-  draw_run_order(nb, path)    one box per task, arrows = "must run before", fill = CPU / GPU, file badge under each box
+  draw_run_order(nb, path)    one box per task, arrows = must run before, fill = CPU / GPU, file badge under each box
   draw_data_flow(nb, path)    what turns into what, with the file name under each box
   draw_design_2x2(path)       the 2x2 design (harmful/benign x vanilla/adversarial) and what dp measures
   draw_status(rows, path)     one horizontal bar per task, coloured DONE / WAITING / NOT RUN / PROBLEM

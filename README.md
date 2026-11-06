@@ -58,13 +58,13 @@ layer before the final norm. r̂ is fitted on vanilla TRAIN pairs only; splits a
 |---|---|
 | `analysis/lib.py`, `geometry.py` | Loading, splits, r̂, projections, bootstrap CIs, effect sizes; the A2/A5/A7/A8/X5 maths |
 | `analysis/ws3_pilot.py` | `run_all(folder, view)`: every WS3 analysis and figure for one extraction folder |
-| `analysis/regenerate_all.py` | Every WS3 figure and `results/*.json` from one command, over all folders under `$A5_WORK_ROOT` |
+| `analysis/regenerate_all.py` | Every WS3 figure (including paper figure F2) and `results/*.json` from one command, over all folders under `$A5_WORK_ROOT` |
 | `analysis/figures.py`, `plotstyle.py`, `diagrams.py` | Figures (shared style: harmful orange, benign blue, adversarial hatched) |
 | `analysis/pilot_*.py`, `harvest_figures.py`, `prereg_tools.py`, `team_inputs.py`, `notebook_maps.py`, `contact_sheet.py` | Week 3 pilot (A1-A3), shard checks, pre-registration lock, Colab helpers |
 | `harvest/ws3_harvest.py` | Gemma-2-9B / Mistral-7B / Qwen prompt-position harvest (HF, batch 1; `--config c1` bf16 or `c6` NF4) |
 | `harvest/ws3_pilot_extract.py`, `pilot_extract.py`, `token_check.py` | Qwen2.5-1.5B pilots and the chat-template token-position check |
 | `harvest/dennis_harvest_convert.py` | Converts Dennis's Qwen2.5-7B `.tpxz` harvest + pair map into the same folder format |
-| `tests/` | 87 tests on synthetic data with planted answers (no model, no GPU, no real prompts) |
+| `tests/` | Tests on synthetic data with planted answers (no model, no GPU, no real prompts) |
 
 Run (Colab, CPU):
 

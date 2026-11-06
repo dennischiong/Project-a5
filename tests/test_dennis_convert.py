@@ -150,3 +150,20 @@ def test_restore_refuses_an_archive_that_differs_from_its_manifest(tmp_path):
     (tmp_path / "work").mkdir()
     with pytest.raises(ValueError, match="sha256 mismatch"):
         dc.restore_archive(a, tmp_path / "work")
+
+
+def test_sweep_layers_use_the_hidden_states_convention():
+    assert dc.sweep_layers(4) == [4, 8, 12, 16, 20, 24] and dc.sweep_layers(8) == [8, 16, 24]
+    assert dc.sweep_layers(0) == []
+
+
+def test_build_folder_writes_a_sweep_that_load_reads(tmp_path):
+    _, _, table, pm, shard_dirs = fake_world(tmp_path)
+    plan, _ = dc.plan_pairs(pm, table, ["WildJailbreak", "SORRY-Bench"])
+    out = tmp_path / "out"
+    shards = [(*dc.read_shard(s)[:2], dc.read_sweep(s, [8])) for s in shard_dirs]   # hidden_states 8 = layer_7
+    meta = dc.build_folder(plan, shards, out, dict(model_tag="qwen25-7b", config="c6", config_name="hf-nf4-c6",
+                                                  num_hidden_layers=28, sweep_layers=[8], views=["prenorm"]))
+    assert np.load(out / "sweep.npy").shape == (meta["n_prompts"], 1, D)
+    pre, sw = wp.load(out, "prenorm"), wp.load(out, 8)
+    assert np.allclose(pre["H"], sw["H"], atol=1e-2)          # the fake shards store the same vectors at 7 and 27
