@@ -11,6 +11,10 @@ What it does, in order (each step is skipped with a printed reason when its data
   5  X5 per model: C6 (NF4) against C1 (HF bf16) on the same pairs -> figures/WS3/X5_*.png, results/WS3_X5.json
   5b A2 across layers (exploratory), every folder with a layer sweep: sweep layers + the last layer pre-norm
                                                                 -> figures/WS3/<folder>/A2_layers.png, results/WS3_layer_sweep.json
+  5c H2 per model with WildGuard labels in ws3_judges/ (analysis/judge_labels.py); step 3 also adds their A8 angle
+                                                                -> results/WS3_H2.json
+  5d H3 parts (a)-(c) per model, WildJailbreak test pairs (analysis/h3_test.py) -> results/WS3_H3.json
+  5e Holm over H1-H7 per model (analysis/holm.py; H4-H7 from results/probe_pvalues.json when it exists) -> results/WS3_Holm.json
   6  contact sheet of the real figures                          -> figures/WS3/_real_contact_sheet.png
 
     python analysis/regenerate_all.py [--data-root $A5_WORK_ROOT] [--skip-previews] [--n-boot 2000]
@@ -87,14 +91,18 @@ def step_task6():
     print("[2] Task 6 pilot figures and analysis/pilot_results.json regenerated")
 
 
-def step_folders(folders, n_boot):
+def step_folders(folders, n_boot, data_root=None):
+    from analysis import judge_labels as jl
     from analysis import ws3_pilot as wp
     made = []
     for f in folders:
+        info = folder_info(f)
+        judged = jl.find_labels(data_root, info["tag"], info["subset"]) if data_root else None
+        labels = jl.load_labels(judged) if judged else None
         # a converted harvest (harvest/dennis_harvest_convert.py) has the pre-norm view only
         for view in [v for v in ("prenorm", "postnorm") if (f / f"{v}_last.npy").exists()]:
             res, figs = wp.run_all(f, view, fig_dir=REPO / "figures" / "WS3" / f.name,
-                                   results_path=REPO / "results" / f"WS3_{f.name}_{view}.json", n_boot=n_boot)
+                                   results_path=REPO / "results" / f"WS3_{f.name}_{view}.json", n_boot=n_boot, labels=labels)
             made += [p for p in figs.values() if p]
             print(f"[3] {f.name} {view}: {len(figs)} figures")
             for line in wp.summary_lines(res)[:2]:
@@ -103,8 +111,9 @@ def step_folders(folders, n_boot):
 
 
 def folder_rank(info):
-    """Which folder speaks for a model in A2 across models: full C1 first, then full C6, then subset runs."""
-    return (bool(info["subset"]), info["config"] != "c1")
+    """Which folder speaks for a model in A2 across models: full C1 first, then full C6, then subset runs; among
+    otherwise equal runs, bf16 before fp16 (the work plan's dtype)."""
+    return (bool(info["subset"]), info["config"] != "c1", info["meta"].get("dtype", "bfloat16") != "bfloat16")
 
 
 def pick_model_folders(folders):
@@ -116,7 +125,7 @@ def pick_model_folders(folders):
         info = folder_info(f)
         if info["tag"] not in best or folder_rank(info) <= folder_rank(best[info["tag"]][1]):
             best[info["tag"]] = (f, info)
-    same = (all(folder_rank(i) == (False, False) for _, i in best.values())
+    same = (all(folder_rank(i)[:2] == (False, False) for _, i in best.values())
             and len({i["meta"].get("config_name", i["config"]) for _, i in best.values()}) == 1)
     return {t: f for t, (f, _) in best.items()}, same
 
@@ -252,6 +261,65 @@ def step_sweep(folders, n_boot):
     return made
 
 
+def step_h2(folders, data_root, n_boot):
+    """H2 for each model with labels, on its C1 folder if there is one (same prompt subset as the labels)."""
+    from analysis import judge_labels as jl
+    from analysis import ws3_data
+    by_tag = {}
+    for f in folders:
+        info = folder_info(f)
+        judged = jl.find_labels(data_root, info["tag"], info["subset"])
+        if judged:
+            by_tag.setdefault(info["tag"], []).append((f, info, judged))
+    if not by_tag:
+        print("[5c] skipped: no WildGuard labels in ws3_judges/ for any model")
+        return
+    out = {}
+    for tag, rows in by_tag.items():
+        f, info, judged = min(rows, key=lambda r: r[1]["config"] != "c1")
+        labels = jl.load_labels(judged)
+        lmeta = json.loads((judged / "meta.json").read_text())
+        views = [v for v in ("prenorm", "postnorm") if (f / f"{v}_last.npy").exists()]
+        out[tag] = dict(activations=dict(folder=f.name, config=info["meta"].get("config_name", info["config"]),
+                                         gpu=info["meta"].get("gpu")),
+                        labels=dict(folder=judged.name, replies_backend=lmeta.get("replies_backend"), replies_dtype=lmeta.get("replies_dtype")),
+                        deciding_rule=jl.H2_SUCCESS_RULE, position="prompt[-1]", layer="last", note=jl.NOTE,
+                        views={v: jl.h2_for_folder(f, labels, v, n_boot) for v in views})
+        row = out[tag]["views"][views[0]]["wildjailbreak"][jl.H2_SUCCESS_RULE]
+        print(f"[5c] {tag} ({views[0]}, {jl.H2_SUCCESS_RULE}): {row['verdict']} | success {row['n_success']}, fail {row['n_fail']} | "
+              f"difference {row['difference']}")
+    ws3_data.save_json(out, REPO / "results" / "WS3_H2.json")
+
+
+def step_h3(folders, n_boot):
+    """H3 parts (a)-(c) per model on the folder A2 across models uses (analysis/h3_test.py), pre- and post-norm."""
+    from analysis import h3_test, ws3_data
+    from analysis import ws3_pilot as wp
+    chosen, _ = pick_model_folders(folders)
+    out = dict(note=h3_test.NOTE, position="prompt[-1]", layer="last", deciding_view="prenorm", models={})
+    for tag, f in chosen.items():
+        info = folder_info(f)
+        row = dict(folder=f.name, config=info["meta"].get("config_name", info["config"]), gpu=info["meta"].get("gpu"), views={})
+        for view in ("prenorm", "postnorm"):
+            if not (f / f"{view}_last.npy").exists():
+                continue
+            Hv, Ha, meta = wp.pair_arrays(wp.load(f, view), "WildJailbreak")
+            row["views"][view] = h3_test.h3_parts(Hv, Ha, meta, n_boot=n_boot)
+        out["models"][tag] = row
+        r = row["views"]["prenorm"]
+        print(f"[5d] H3 {tag} (pre-norm): {r['verdict']} | (a) style {r['a']['style']} | (b) G2 AUROC {r['b']['auroc']} | "
+              f"(c) score diff {r['c']['score_difference']} vs margin {r['c']['margin']:.4f}")
+    ws3_data.save_json(out, REPO / "results" / "WS3_H3.json")
+    from analysis import figures as F
+    print("[5d] figure", F.h3_probe_shift(json.loads(json.dumps(ws3_data.jsonable(out))), REPO / "figures" / "WS3" / "H3_probe_shift.png"))
+
+
+def step_holm(data_root, n_boot):
+    import subprocess
+    subprocess.run([sys.executable, str(REPO / "analysis" / "holm.py"), "--data-root", str(data_root), "--n-boot", str(n_boot)],
+                   check=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-root", default=DATA_ROOT)
@@ -273,10 +341,13 @@ def main():
     step_task6()
     folders = find_folders(a.data_root)
     print(f"real extraction folders: {[f.name for f in folders] or 'none yet'}")
-    made = step_folders(folders, a.n_boot)
+    made = step_folders(folders, a.n_boot, a.data_root)
     made += step_models(folders, a.n_boot)
     made += step_x5(folders, a.n_boot)
     made += step_sweep(folders, a.n_boot)
+    step_h2(folders, a.data_root, a.n_boot)
+    step_h3(folders, a.n_boot)
+    step_holm(a.data_root, a.n_boot)
     if made:
         from analysis import contact_sheet as cs
         p = cs.contact_sheet(made, REPO / "figures" / "WS3" / "_real_contact_sheet.png", what="real data")

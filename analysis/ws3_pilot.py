@@ -14,7 +14,8 @@ for a harvest/ws3_harvest.py folder, see run_labels; A5/A8 always EXPLORATORY):
   A5   cosine between the 19 tactics' mean displacements, PCA, principal angles between tactic subspaces (k = 3),
        same-tactic share of k-NN neighbours vs chance, and how much of each tactic's move lies along r_hat
   A8   singular-value spectrum of the displacements (all and per tactic), and the angle between r_hat and a refusal
-       direction from a NEXT-TOKEN PROXY (refusal-word mass at prompt[-1]), not judge labels
+       direction from a NEXT-TOKEN PROXY (refusal-word mass at prompt[-1]), not judge labels. When WildGuard labels
+       exist (analysis/judge_labels.py), the angle from those labels is reported next to the proxy's
 Numbers only: no prompt text or reply is ever read here.
 """
 import hashlib
@@ -318,8 +319,9 @@ def run_labels(meta):
                              "A5 and A8 are EXPLORATORY.")
 
 
-def run_all(folder, view="prenorm", fig_dir="figures/WS3/pilot", results_path=None, n_boot=2000, seed=0, k_angle=3):
-    """Every WS3 pilot analysis and figure from one call. Returns (results dict, {name: png path})."""
+def run_all(folder, view="prenorm", fig_dir="figures/WS3/pilot", results_path=None, n_boot=2000, seed=0, k_angle=3, labels=None):
+    """Every WS3 pilot analysis and figure from one call. Returns (results dict, {name: png path}).
+    labels: optional WildGuard labels (analysis/judge_labels.py); they only add to A8, nothing else changes."""
     plt, F, ps = _fig_tools()
     d = load(folder, view)
     model, kind, note = run_labels(d["meta"])
@@ -416,6 +418,13 @@ def run_all(folder, view="prenorm", fig_dir="figures/WS3/pilot", results_path=No
                      refusal_proxy=("not in this extraction (no next-token stats)" if refused is None else
                                     dict(words=REFUSAL_WORDS, threshold=0.5, train_rows=int(len(rows_tr)),
                                          share_refused_train=float(refused[rows_tr].mean()))))
+    if labels is not None:
+        from analysis import judge_labels as jl
+        wg_a8 = jl.refusal_angle(d["H"], rows_tr, r_hat, jl.align(d["prompts"], labels))
+        res["A8"]["refusal_wildguard"] = wg_a8
+        if wg_a8["angle_deg"] is not None:
+            F.TITLE_NOTE = "EXPLORATORY; refusal = WildGuard on vLLM replies"
+            figs["A8_angle_wildguard"] = F.a8_angle_arc(wg_a8["angle_deg"], fig_dir / f"A8_angle_wildguard{tag}.png", kind, model, layer, pos)
     F.TITLE_NOTE = None
     if results_path:
         from analysis import ws3_data
@@ -443,6 +452,8 @@ def summary_lines(res):
         out.append(f"A8: effective rank SORRY {a8['sorry']['effective_rank']:.1f} ({a8['sorry']['directions_90']} dirs for 90%), "
                    f"WildJailbreak {a8['wildjailbreak']['effective_rank']:.1f} ({a8['wildjailbreak']['directions_90']}); "
                    f"angle r_hat vs refusal proxy: {a8['angle_harm_vs_refusal_proxy_deg']}")
+        if "refusal_wildguard" in a8:
+            out.append(f"A8: angle r_hat vs WildGuard refusal: {a8['refusal_wildguard']['angle_deg']}")
     return out
 
 

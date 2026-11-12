@@ -24,6 +24,14 @@ def test_full_c1_beats_full_c6_beats_subsets(tmp_path):
     assert ra.pick_model_folders([d, a, b, c])[0] == {"m": d}
 
 
+def test_bf16_beats_fp16_when_runs_are_otherwise_equal(tmp_path):
+    fp = folder(tmp_path, "ws3_harvest", "q__hf-fp16-bs1", model_tag="q", config="c1", dtype="float16")
+    bf = folder(tmp_path, "ws3_harvest", "q__hf-bf16-bs1", model_tag="q", config="c1", dtype="bfloat16")
+    assert ra.pick_model_folders([bf, fp])[0] == {"q": bf}     # fp16 sorts later but still loses
+    sub = folder(tmp_path, "ws3_harvest", "q__bf16_sub", model_tag="q", config="c1", dtype="bfloat16", subset=4000)
+    assert ra.pick_model_folders([sub, fp])[0] == {"q": fp}    # a full run still beats a subset run
+
+
 def test_same_config_only_when_every_model_is_a_full_c1_run_in_one_precision(tmp_path):
     q1 = folder(tmp_path, "ws3_harvest", "q1", model_tag="qwen25-1p5b", config="c1", config_name="hf-fp16-bs1")
     q7 = folder(tmp_path, "ws3_harvest", "q7", model_tag="qwen25-7b", config="c6", config_name="hf-nf4-c6")

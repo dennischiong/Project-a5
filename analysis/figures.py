@@ -539,3 +539,65 @@ def render_all_synthetic(folder):
     out.append(ws3_summary({"A2 (F2)": out[5], "A5 cosine": out[8], "A7 style vs content": out[12],
                             "A8 spectrum": out[13], "X5 cosine": out[15]}, folder / "WS3_summary_SYNTHETIC.png", "SYNTHETIC"))
     return out
+
+
+# ------------------------------------------------------------------------------------------------ H3 and Holm
+MODEL_NAME = {"qwen25-7b": "Qwen2.5-7B", "qwen25-1p5b": "Qwen2.5-1.5B", "mistral-7b": "Mistral-7B", "gemma2-9b": "Gemma-2-9B"}
+
+
+def h3_probe_shift(h3, path, kind="RESULT", view="prenorm"):
+    """H3 (c): the vanilla-trained harmfulness probe's mean P(harmful) on benign test prompts, plain vs written as a
+    jailbreak, per model; grey band = the +/- m margin around the plain score; orange tick = plain harmful prompts.
+    h3: results/WS3_H3.json as a dict."""
+    ps.apply_style()
+    tags = list(h3["models"])
+    fig, ax = plt.subplots(figsize=(7.5, 0.75 * len(tags) + 1.9))
+    for i, t in enumerate(tags[::-1]):
+        r = h3["models"][t]["views"][view]
+        c, ms = r["c"], r["c"]["mean_score"]
+        vb, ab, vh = ms["vanilla_benign"], ms["adversarial_benign"], ms["vanilla_harmful"]
+        ax.add_patch(plt.Rectangle((vb - c["margin"], i - 0.28), 2 * c["margin"], 0.56, color=ps.GRID, zorder=1))
+        ax.plot([vb, ab], [i, i], color=ps.BLUE, lw=2, zorder=2)
+        ax.scatter([vb], [i], s=55, color=ps.BLUE, zorder=3, label="benign, plain" if i == 0 else None)
+        ax.scatter([ab], [i], s=55, facecolor="white", edgecolor=ps.BLUE, lw=2, hatch="///", zorder=3,
+                   label="benign, written as a jailbreak" if i == 0 else None)
+        ax.plot([vh, vh], [i - 0.25, i + 0.25], color=ps.ORANGE, lw=2.5, zorder=3, label="harmful, plain" if i == 0 else None)
+        verdict = " ".join(f"({k}) {'yes' if r[k]['holds'] else 'no'}" for k in ("a", "b", "c"))
+        ax.text(1.02, i, verdict, va="center", fontsize=7, color=ps.INK2, transform=ax.get_yaxis_transform())
+    ax.set_yticks(range(len(tags)), [MODEL_NAME.get(t, t) for t in tags[::-1]], fontsize=8)
+    ax.set(xlim=(-0.02, 1.02), ylim=(-0.6, len(tags) - 0.4), xlabel="harmfulness probe, mean P(harmful) on test prompts")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.28), ncol=3, fontsize=7, frameon=False)
+    return _finish(fig, kind, "four models", "last, " + view.replace("norm", "-norm"), "prompt[-1]",
+                   "H3: the jailbreak form alone raises the probe's harm score",
+                   "grey band = H3 (c) margin, +/-10% of the plain harmful-benign gap; right: H3 parts (a) (b) (c) met", path)
+
+
+def holm_pvalues(res, path, kind="RESULT"):
+    """Holm over H1-H7: each WS3 test's bootstrap p-value per model (log scale) against 0.05/7 (survives whatever H4-H7
+    give) and 0.05 (never survives). res: results/WS3_Holm.json as a dict."""
+    ps.apply_style()
+    tags = list(res["models"])
+    tests, cols = ("H1", "H2", "H3"), (ps.BLUE, ps.ORANGE, ps.AQUA)
+    fig, ax = plt.subplots(figsize=(7.5, 0.75 * len(tags) + 1.9))
+    m, alpha = len(res["family"]), res["alpha"]
+    ax.axvspan(1e-4, alpha / m, color=ps.GRID, alpha=0.6, zorder=0)
+    for x, lab in ((alpha / m, f"0.05/{m}"), (alpha, "0.05")):
+        ax.axvline(x, color=ps.INK2, lw=1, ls="--", zorder=1)
+        ax.text(x, len(tags) - 0.45, lab, ha="center", va="bottom", fontsize=7, color=ps.INK2)
+    for i, t in enumerate(tags[::-1]):
+        pv = res["models"][t]["pvalues"]
+        for k, (h, col) in enumerate(zip(tests, cols)):
+            y = i + (1 - k) * 0.2
+            if pv.get(h) is None:
+                ax.text(1.5, y, f"{h} not run ", ha="right", va="center", fontsize=6.5, color=ps.MUTED)
+                continue
+            ax.scatter([max(pv[h], 1.2e-4)], [y], s=40, color=col, zorder=3)
+    ax.set_xscale("log")
+    ax.set(xlim=(1e-4, 1.5), ylim=(-0.6, len(tags) - 0.1), xlabel="bootstrap p-value (pre-registered vector)")
+    ax.set_yticks(range(len(tags)), [MODEL_NAME.get(t, t) for t in tags[::-1]], fontsize=8)
+    for h, col in zip(tests, cols):
+        ax.scatter([], [], s=40, color=col, label=h)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.28), ncol=3, fontsize=7, frameon=False)
+    return _finish(fig, kind, "four models", "last, pre-norm", "prompt[-1]",
+                   "Holm over H1-H7: which WS3 tests survive",
+                   "shaded = survives whatever H4-H7 give; right of 0.05 = never survives; H4-H7 from the probe work", path)
