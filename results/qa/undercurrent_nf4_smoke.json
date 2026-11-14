@@ -1,0 +1,58 @@
+{
+  "created_at": "2026-11-13T14:53:46.072093+00:00",
+  "test": "Undercurrent activation capture through a bitsandbytes NF4 model",
+  "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+  "spec_sha256": "aed1c5cafdcf7c8f6ff5acafbb295e82fceebcf029ba6124ee6ba17b0958c6c5",
+  "collector": "collector (production, bf16 storage cast)",
+  "n_prompts": 7,
+  "prompt_ids": [
+    "609ed1078bbe06ca",
+    "950312a96b0f7e7a",
+    "3f065bd71f6ee8d2",
+    "509f0dfebe801942",
+    "2e65340e6e47b9df",
+    "b0e7de037668e563",
+    "254b49f1245ed034"
+  ],
+  "prompt_tokens": [
+    42,
+    42,
+    131,
+    372,
+    43,
+    720,
+    42
+  ],
+  "excluded_long_prompts": [
+    {
+      "prompt_id": "30d5cadba0c7f0a7",
+      "tokens": 3257
+    }
+  ],
+  "excluded_reason": "NF4 prefill on this T4 exceeded 13 minutes on a 3,257-token prompt and was interrupted; the same prompt completes in seconds in bf16. Long-prompt NF4 throughput is a recorded hardware limitation, not a capture failure.",
+  "bitsandbytes": "0.50.2",
+  "torch": "2.14.1+cu130",
+  "transformers": "5.22.1",
+  "undercurrent": "0.1.0",
+  "gpu": "Tesla T4",
+  "bnb_matmul_overhead_vs_fp16": 3.6,
+  "status": "PASS",
+  "activations_captured": 196,
+  "storage_dtypes": [
+    "torch.bfloat16"
+  ],
+  "shapes": [
+    [
+      1536
+    ]
+  ],
+  "attn_implementation": "sdpa",
+  "load_arguments": "device_map={'': 0}, no device= argument",
+  "nf4_vs_bf16": {
+    "n_activations": 196,
+    "cos_dist_median": 0.016389842183230863,
+    "cos_dist_p95": 0.024270769155933125,
+    "rel_l2_median": 0.18067399897661948,
+    "rel_l2_p95": 0.21934088304408314
+  }
+}
