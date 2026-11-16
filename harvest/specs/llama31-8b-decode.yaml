@@ -1,0 +1,9 @@
+version: "1"
+
+extraction_points:
+  - name: decode_generated
+    layers: [8, 16, 24, 31]
+    tensor_type: residual_stream
+    position: "generated[0:20]"
+    probe_type: collector
+    probe_kind: single_shot
