@@ -1,0 +1,1209 @@
+{
+  "created_at": "2026-11-17T03:27:09.217201+00:00",
+  "analysis": "A4 delta_p and first-token refusal mass vs jailbreak success",
+  "owner": "WS2 (Kayson)",
+  "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+  "harvest": "mistral-7b__wj-sorry__hf-bf16-bs1",
+  "primary": {
+    "outcome": "WildGuard harmful response on the adversarial reply (judge status ok only)",
+    "position": "prompt[-1], layer 31 (prenorm_last)",
+    "refusal_tokens": [
+      "I",
+      "Sorry"
+    ],
+    "compliance_tokens": [
+      "Sure",
+      "Here"
+    ],
+    "direction": "vanilla-only difference of means, split 'train', disjoint from every evaluated prompt",
+    "label_columns": {
+      "key": "prompt_key",
+      "status": "status",
+      "harmful_response": "harmful_response",
+      "refusal": "refusal",
+      "truncated": "reply_truncated"
+    }
+  },
+  "head": {
+    "source": "drive_cache",
+    "cache": "<drive>/MYSSP/a5-artifacts/harvest/results/_cache/mistral-7b_a4_head_cache.npz",
+    "rms_norm_eps": 1e-05,
+    "vocab": 32768
+  },
+  "token_sets": {
+    "refusal": {
+      "I": [
+        1083,
+        29505
+      ],
+      "Sorry": [
+        20153,
+        23934
+      ]
+    },
+    "compliance": {
+      "Sure": [
+        13643,
+        22867
+      ],
+      "Here": [
+        4771,
+        16191
+      ]
+    },
+    "refusal_ext": {
+      "I": [
+        1083,
+        29505
+      ],
+      "Sorry": [
+        20153,
+        23934
+      ],
+      "Unfortunately": [
+        14213
+      ],
+      "As": [
+        1904,
+        2966
+      ],
+      "Apologies": []
+    },
+    "compliance_ext": {
+      "Sure": [
+        13643,
+        22867
+      ],
+      "Here": [
+        4771,
+        16191
+      ],
+      "Certainly": [],
+      "Absolutely": [],
+      "Yes": [
+        6360,
+        6381
+      ]
+    }
+  },
+  "selection": {
+    "n_eval_pairs": 2976,
+    "n_harmful_pairs_analysed": 2218,
+    "n_not_understood_harmful": 462,
+    "n_benign_pairs": 296,
+    "fit_harmful": 484,
+    "fit_benign": 510,
+    "fit_conflicts_dropped": 0,
+    "split_values": {
+      "train": 7884,
+      "val": 1464,
+      "test": 1448
+    },
+    "pairs_without_valid_label_dropped": 7820
+  },
+  "direction": {
+    "n_harmful": 484,
+    "n_benign": 510,
+    "mean_difference_norm": 12.178951481155659,
+    "cosine_fit_vs_any_split": 0.9986304768157397,
+    "heldout_vanilla_auroc_harmful": {
+      "n_vanilla_prompts": 1030,
+      "auroc": 0.974731202592238,
+      "lo": 0.9660185637974921,
+      "hi": 0.9826916887886665
+    }
+  },
+  "qa": {
+    "postnorm_vs_norm_of_prenorm_cosine_min": 0.9999953508377075,
+    "postnorm_vs_norm_of_prenorm_cosine_median": 0.9999972581863403,
+    "argmax_matches_reply_first_token": 0.9797449362340586,
+    "n_prompts_with_reply": 3999
+  },
+  "warnings": [
+    "replies and WildGuard labels come from a vLLM bf16 run; the activations come from an HF bf16 batch-1 run (different backend). About 85% of replies hit the 256-token cap; see 'sensitivity_not_truncated' for the replies that did not."
+  ],
+  "results": {
+    "wg_harmful": {
+      "last_prefill_L31": {
+        "n_pairs": 2218,
+        "n_succeeded": 564,
+        "n_failed": 1654,
+        "success_rate": 0.25428313796212804,
+        "groups": {
+          "succeeded": {
+            "n_pairs": 564,
+            "delta_p": {
+              "n": 564,
+              "median": -3.039061752901409,
+              "lo": -3.425415958308854,
+              "hi": -2.506708404227782
+            },
+            "refusal_mass": {
+              "n": 564,
+              "median": 0.00016385923663619906,
+              "lo": 7.540679871453904e-05,
+              "hi": 0.0003191195137333125
+            },
+            "compliance_mass": {
+              "n": 564,
+              "median": 1.4672977158625145e-05,
+              "lo": 1.0938007108052261e-05,
+              "hi": 2.0114817743888125e-05
+            }
+          },
+          "failed": {
+            "n_pairs": 1654,
+            "delta_p": {
+              "n": 1654,
+              "median": -4.992720206414912,
+              "lo": -5.367433343064544,
+              "hi": -4.660781768271435
+            },
+            "refusal_mass": {
+              "n": 1654,
+              "median": 0.002602088381536305,
+              "lo": 0.0019238602835685015,
+              "hi": 0.0034086735686287284
+            },
+            "compliance_mass": {
+              "n": 1654,
+              "median": 4.1537316064932384e-05,
+              "lo": 3.3962317684199664e-05,
+              "hi": 5.0311264203628525e-05
+            }
+          }
+        },
+        "median_difference_succeeded_minus_failed": {
+          "delta_p": {
+            "diff": 1.953658453513503,
+            "lo": 1.4845216597016857,
+            "hi": 2.579777100411065
+          },
+          "refusal_mass": {
+            "diff": -0.002438229144900106,
+            "lo": -0.0032926431397754643,
+            "hi": -0.0017336348390017524
+          }
+        },
+        "auroc_for_success": {
+          "delta_p (higher = success)": {
+            "auroc": 0.6185509875050383,
+            "lo": 0.5933725151418288,
+            "hi": 0.6430601670346693
+          },
+          "refusal_mass (higher = success)": {
+            "auroc": 0.36522035555326865,
+            "lo": 0.3399420251536527,
+            "hi": 0.3935417266919777
+          }
+        },
+        "logistic": {
+          "fitted": true,
+          "n": 2218,
+          "n_success": 564,
+          "converged": true,
+          "standardisation": {
+            "delta_p": {
+              "mean": -4.614675723450376,
+              "sd": 4.639463411186512
+            },
+            "refusal_mass": {
+              "mean": 0.11959583955731355,
+              "sd": 0.2561004414090224
+            }
+          },
+          "bootstrap_resamples_used": 2000,
+          "bootstrap_skipped_one_class": 0,
+          "bootstrap_not_converged": 0,
+          "coefficients": {
+            "intercept": {
+              "value": -1.165607146248462,
+              "lo": -1.274008678786257,
+              "hi": -1.0660201684831134,
+              "odds_ratio_per_sd": null
+            },
+            "delta_p": {
+              "log_odds_per_sd": 0.5442671356824579,
+              "lo": 0.4446434839882269,
+              "hi": 0.6451076379038002,
+              "odds_ratio_per_sd": 1.7233449414531912
+            },
+            "refusal_mass": {
+              "log_odds_per_sd": -0.47924416381183976,
+              "lo": -0.6150428573143496,
+              "hi": -0.3554483897141289,
+              "odds_ratio_per_sd": 0.6192512674827101
+            }
+          }
+        },
+        "logistic_delta_p_only": {
+          "fitted": true,
+          "n": 2218,
+          "n_success": 564,
+          "converged": true,
+          "standardisation": {
+            "delta_p": {
+              "mean": -4.61467572345038,
+              "sd": 4.6394634111865125
+            }
+          },
+          "bootstrap_resamples_used": 2000,
+          "bootstrap_skipped_one_class": 0,
+          "bootstrap_not_converged": 0,
+          "coefficients": {
+            "intercept": {
+              "value": -1.120037817245495,
+              "lo": -1.2220871297575915,
+              "hi": -1.0212821896465831,
+              "odds_ratio_per_sd": null
+            },
+            "delta_p": {
+              "log_odds_per_sd": 0.4293169671505342,
+              "lo": 0.3371130109883267,
+              "hi": 0.5246161043333837,
+              "odds_ratio_per_sd": 1.5362078846713336
+            }
+          }
+        },
+        "logistic_refusal_mass_only": {
+          "fitted": true,
+          "n": 2218,
+          "n_success": 564,
+          "converged": true,
+          "standardisation": {
+            "refusal_mass": {
+              "mean": 0.11959583955731357,
+              "sd": 0.25610044140902244
+            }
+          },
+          "bootstrap_resamples_used": 2000,
+          "bootstrap_skipped_one_class": 0,
+          "bootstrap_not_converged": 0,
+          "coefficients": {
+            "intercept": {
+              "value": -1.102454052970929,
+              "lo": -1.2061987694879852,
+              "hi": -1.0063062423226652,
+              "odds_ratio_per_sd": null
+            },
+            "refusal_mass": {
+              "log_odds_per_sd": -0.32709070395814943,
+              "lo": -0.451852676745286,
+              "hi": -0.21100248258305887,
+              "odds_ratio_per_sd": 0.7210183408431206
+            }
+          }
+        }
+      },
+      "last_prefill_L31_extended_tokens": {
+        "n_pairs": 2218,
+        "n_succeeded": 564,
+        "n_failed": 1654,
+        "success_rate": 0.25428313796212804,
+        "groups": {
+          "succeeded": {
+            "n_pairs": 564,
+            "delta_p": {
+              "n": 564,
+              "median": -3.039061752901409,
+              "lo": -3.425415958308854,
+              "hi": -2.506708404227782
+            },
+            "refusal_mass": {
+              "n": 564,
+              "median": 0.0006914348632562906,
+              "lo": 0.0004005070819403045,
+              "hi": 0.0012819924741052091
+            },
+            "compliance_mass": {
+              "n": 564,
+              "median": 1.4952302080928348e-05,
+              "lo": 1.1554986031114822e-05,
+              "hi": 2.040783601842122e-05
+            }
+          },
+          "failed": {
+            "n_pairs": 1654,
+            "delta_p": {
+              "n": 1654,
+              "median": -4.992720206414912,
+              "lo": -5.367433343064544,
+              "hi": -4.660781768271435
+            },
+            "refusal_mass": {
+              "n": 1654,
+              "median": 0.00348017574287951,
+              "lo": 0.0027289415622362865,
+              "hi": 0.004666493274271488
+            },
+            "compliance_mass": {
+              "n": 1654,
+              "median": 5.2850555221084505e-05,
+              "lo": 4.265338066034019e-05,
+              "hi": 6.408316176020884e-05
+            }
+          }
+        },
+        "median_difference_succeeded_minus_failed": {
+          "delta_p": {
+            "diff": 1.953658453513503,
+            "lo": 1.4845216597016857,
+            "hi": 2.579777100411065
+          },
+          "refusal_mass": {
+            "diff": -0.0027887408796232194,
+            "lo": -0.004053387120802654,
+            "hi": -0.0017919563688337805
+          }
+        },
+        "auroc_for_success": {
+          "delta_p (higher = success)": {
+            "auroc": 0.6185509875050383,
+            "lo": 0.5933725151418288,
+            "hi": 0.6430601670346693
+          },
+          "refusal_mass (higher = success)": {
+            "auroc": 0.4158412445221985,
+            "lo": 0.38869777015616847,
+            "hi": 0.44533123385212176
+          }
+        },
+        "logistic": {
+          "fitted": true,
+          "n": 2218,
+          "n_success": 564,
+          "converged": true,
+          "standardisation": {
+            "delta_p": {
+              "mean": -4.614675723450376,
+              "sd": 4.639463411186512
+            },
+            "refusal_mass": {
+              "mean": 0.1353180337947319,
+              "sd": 0.26913568750666744
+            }
+          },
+          "bootstrap_resamples_used": 2000,
+          "bootstrap_skipped_one_class": 0,
+          "bootstrap_not_converged": 0,
+          "coefficients": {
+            "intercept": {
+              "value": -1.147916242401114,
+              "lo": -1.2500278299230765,
+              "hi": -1.048297573515975,
+              "odds_ratio_per_sd": null
+            },
+            "delta_p": {
+              "log_odds_per_sd": 0.5349036871958475,
+              "lo": 0.432986311073304,
+              "hi": 0.6377615507488857,
+              "odds_ratio_per_sd": 1.7072838010450788
+            },
+            "refusal_mass": {
+              "log_odds_per_sd": -0.3720933155693462,
+              "lo": -0.4913506706083562,
+              "hi": -0.2571846380510247,
+              "odds_ratio_per_sd": 0.6892899180418846
+            }
+          }
+        },
+        "logistic_delta_p_only": {
+          "fitted": true,
+          "n": 2218,
+          "n_success": 564,
+          "converged": true,
+          "standardisation": {
+            "delta_p": {
+              "mean": -4.61467572345038,
+              "sd": 4.6394634111865125
+            }
+          },
+          "bootstrap_resamples_used": 2000,
+          "bootstrap_skipped_one_class": 0,
+          "bootstrap_not_converged": 0,
+          "coefficients": {
+            "intercept": {
+              "value": -1.120037817245495,
+              "lo": -1.2220871297575915,
+              "hi": -1.0212821896465831,
+              "odds_ratio_per_sd": null
+            },
+            "delta_p": {
+              "log_odds_per_sd": 0.4293169671505342,
+              "lo": 0.3371130109883267,
+              "hi": 0.5246161043333837,
+              "odds_ratio_per_sd": 1.5362078846713336
+            }
+          }
+        },
+        "logistic_refusal_mass_only": {
+          "fitted": true,
+          "n": 2218,
+          "n_success": 564,
+          "converged": true,
+          "standardisation": {
+            "refusal_mass": {
+              "mean": 0.13531803379473184,
+              "sd": 0.2691356875066677
+            }
+          },
+          "bootstrap_resamples_used": 2000,
+          "bootstrap_skipped_one_class": 0,
+          "bootstrap_not_converged": 0,
+          "coefficients": {
+            "intercept": {
+              "value": -1.0870130313775035,
+              "lo": -1.1881931071392893,
+              "hi": -0.9927956837590689,
+              "odds_ratio_per_sd": null
+            },
+            "refusal_mass": {
+              "log_odds_per_sd": -0.2106931402779721,
+              "lo": -0.31620813226397737,
+              "hi": -0.10506074237383731,
+              "odds_ratio_per_sd": 0.8100225920555777
+            }
+          }
+        }
+      }
+    },
+    "wg_complied": {
+      "last_prefill_L31": {
+        "n_pairs": 2218,
+        "n_succeeded": 1927,
+        "n_failed": 291,
+        "success_rate": 0.8688007213706042,
+        "groups": {
+          "succeeded": {
+            "n_pairs": 1927,
+            "delta_p": {
+              "n": 1927,
+              "median": -4.5467227120100056,
+              "lo": -4.8030184931819395,
+              "hi": -4.284327517398932
+            },
+            "refusal_mass": {
+              "n": 1927,
+              "median": 0.0010774694383144379,
+              "lo": 0.0008413404575549066,
+              "hi": 0.0012658446794375777
+            },
+            "compliance_mass": {
+              "n": 1927,
+              "median": 3.1546238460578024e-05,
+              "lo": 2.6097078534803587e-05,
+              "hi": 3.723963527590968e-05
+            }
+          },
+          "failed": {
+            "n_pairs": 291,
+            "delta_p": {
+              "n": 291,
+              "median": -2.8029761105485074,
+              "lo": -3.883058889776513,
+              "hi": -2.0788798434234175
+            },
+            "refusal_mass": {
+              "n": 291,
+              "median": 0.07179511338472366,
+              "lo": 0.016169888898730278,
+              "hi": 0.2241315096616745
+            },
+            "compliance_mass": {
+              "n": 291,
+              "median": 2.3336186131928116e-05,
+              "lo": 1.3666151971847285e-05,
+              "hi": 4.2634535930119455e-05
+            }
+          }
+        },
+        "median_difference_succeeded_minus_failed": {
+          "delta_p": {
+            "diff": -1.7437466014614982,
+            "lo": -2.5246364735747635,
+            "hi": -0.6180166506725451
+          },
+          "refusal_mass": {
+            "diff": -0.07071764394640923,
+            "lo": -0.21232127389521338,
+            "hi": -0.016707967860566195
+          }
+        },
+        "auroc_for_success": {
+          "delta_p (higher = success)": {
+            "auroc": 0.41538313387082104,
+            "lo": 0.38459976398072004,
+            "hi": 0.44836605440925653
+          },
+          "refusal_mass (higher = success)": {
+            "auroc": 0.2993988483425084,
+            "lo": 0.26500904200848907,
+            "hi": 0.3337594244260293
+          }
+        },
+        "logistic": {
+          "fitted": true,
+          "n": 2218,
+          "n_success": 1927,
+          "converged": true,
+          "standardisation": {
+            "delta_p": {
+              "mean": -4.614675723450376,
+              "sd": 4.639463411186512
+            },
+            "refusal_mass": {
+              "mean": 0.11959583955731355,
+              "sd": 0.2561004414090224
+            }
+          },
+          "bootstrap_resamples_used": 2000,
+          "bootstrap_skipped_one_class": 0,
+          "bootstrap_not_converged": 0,
+          "coefficients": {
+            "intercept": {
+              "value": 2.0642327943996417,
+              "lo": 1.9339271892029009,
+              "hi": 2.207774188688972,
+              "odds_ratio_per_sd": null
+            },
+            "delta_p": {
+              "log_odds_per_sd": -0.05157836117473901,
+              "lo": -0.17580543563099002,
+              "hi": 0.07633285047120325,
+              "odds_ratio_per_sd": 0.9497292251484631
+            },
+            "refusal_mass": {
+              "log_odds_per_sd": -0.651415323303631,
+              "lo": -0.7515975386781713,
+              "hi": -0.5524474371189214,
+              "odds_ratio_per_sd": 0.5213074358264194
+            }
+          }
+        },
+        "logistic_delta_p_only": {
+          "fitted": true,
+          "n": 2218,
+          "n_success": 1927,
+          "converged": true,
+          "standardisation": {
+            "delta_p": {
+              "mean": -4.61467572345038,
+              "sd": 4.6394634111865125
+            }
+          },
+          "bootstrap_resamples_used": 2000,
+          "bootstrap_skipped_one_class": 0,
+          "bootstrap_not_converged": 0,
+          "coefficients": {
+            "intercept": {
+              "value": 1.9237989307997365,
+              "lo": 1.808545068769373,
+              "hi": 2.049807082460701,
+              "odds_ratio_per_sd": null
+            },
+            "delta_p": {
+              "log_odds_per_sd": -0.30315311938740497,
+              "lo": -0.41748189039518624,
+              "hi": -0.18834978899317034,
+              "odds_ratio_per_sd": 0.7384860111872964
+            }
+          }
+        },
+        "logistic_refusal_mass_only": {
+          "fitted": true,
+          "n": 2218,
+          "n_success": 1927,
+          "converged": true,
+          "standardisation": {
+            "refusal_mass": {
+              "mean": 0.11959583955731357,
+              "sd": 0.25610044140902244
+            }
+          },
+          "bootstrap_resamples_used": 2000,
+          "bootstrap_skipped_one_class": 0,
+          "bootstrap_not_converged": 0,
+          "coefficients": {
+            "intercept": {
+              "value": 2.062961139756804,
+              "lo": 1.932611893155565,
+              "hi": 2.20490594835335,
+              "odds_ratio_per_sd": null
+            },
+            "refusal_mass": {
+              "log_odds_per_sd": -0.6648013842265219,
+              "lo": -0.7634846928118182,
+              "hi": -0.5667415511544123,
+              "odds_ratio_per_sd": 0.5143756806853773
+            }
+          }
+        }
+      }
+    }
+  },
+  "by_source": {
+    "SORRY-Bench": {
+      "n_pairs": 1922,
+      "n_succeeded": 441,
+      "n_failed": 1481,
+      "success_rate": 0.2294484911550468,
+      "groups": {
+        "succeeded": {
+          "n_pairs": 441,
+          "delta_p": {
+            "n": 441,
+            "median": -2.5082630869876805,
+            "lo": -3.0545840149905223,
+            "hi": -2.057817773166466
+          },
+          "refusal_mass": {
+            "n": 441,
+            "median": 0.0003763331042136997,
+            "lo": 0.00019594903278630227,
+            "hi": 0.0006023767055012286
+          },
+          "compliance_mass": {
+            "n": 441,
+            "median": 1.7502301489003003e-05,
+            "lo": 1.3694674635189585e-05,
+            "hi": 2.3240721930051222e-05
+          }
+        },
+        "failed": {
+          "n_pairs": 1481,
+          "delta_p": {
+            "n": 1481,
+            "median": -5.106184340568089,
+            "lo": -5.51142907200844,
+            "hi": -4.720883763083262
+          },
+          "refusal_mass": {
+            "n": 1481,
+            "median": 0.0033967767376452684,
+            "lo": 0.0025935741141438484,
+            "hi": 0.004644742701202631
+          },
+          "compliance_mass": {
+            "n": 1481,
+            "median": 5.1653118134709075e-05,
+            "lo": 4.2485615267651156e-05,
+            "hi": 6.128718086984009e-05
+          }
+        }
+      },
+      "median_difference_succeeded_minus_failed": {
+        "delta_p": {
+          "diff": 2.5979212535804086,
+          "lo": 1.9320128265581862,
+          "hi": 3.246192526052418
+        },
+        "refusal_mass": {
+          "diff": -0.0030204436334315687,
+          "lo": -0.004244061737699667,
+          "hi": -0.0021715926886827224
+        }
+      },
+      "auroc_for_success": {
+        "delta_p (higher = success)": {
+          "auroc": 0.646083956877822,
+          "lo": 0.6193625460951373,
+          "hi": 0.6726549660240082
+        },
+        "refusal_mass (higher = success)": {
+          "auroc": 0.3777431746950412,
+          "lo": 0.34840190561586376,
+          "hi": 0.4078237096172132
+        }
+      },
+      "logistic": {
+        "fitted": true,
+        "n": 1922,
+        "n_success": 441,
+        "converged": true,
+        "standardisation": {
+          "delta_p": {
+            "mean": -4.77020772304184,
+            "sd": 4.637973902472056
+          },
+          "refusal_mass": {
+            "mean": 0.12350150674134822,
+            "sd": 0.2565692471529829
+          }
+        },
+        "bootstrap_resamples_used": 2000,
+        "bootstrap_skipped_one_class": 0,
+        "bootstrap_not_converged": 0,
+        "coefficients": {
+          "intercept": {
+            "value": -1.337598471096934,
+            "lo": -1.4566418318109577,
+            "hi": -1.2278891254973756,
+            "odds_ratio_per_sd": null
+          },
+          "delta_p": {
+            "log_odds_per_sd": 0.6623507466879917,
+            "lo": 0.5509618526832107,
+            "hi": 0.7899228628317645,
+            "odds_ratio_per_sd": 1.9393458911063328
+          },
+          "refusal_mass": {
+            "log_odds_per_sd": -0.4762533625672718,
+            "lo": -0.6299644942876544,
+            "hi": -0.3504498956839665,
+            "odds_ratio_per_sd": 0.6211060972752195
+          }
+        }
+      },
+      "logistic_delta_p_only": {
+        "fitted": true,
+        "n": 1922,
+        "n_success": 441,
+        "converged": true,
+        "standardisation": {
+          "delta_p": {
+            "mean": -4.770207723041842,
+            "sd": 4.637973902472054
+          }
+        },
+        "bootstrap_resamples_used": 2000,
+        "bootstrap_skipped_one_class": 0,
+        "bootstrap_not_converged": 0,
+        "coefficients": {
+          "intercept": {
+            "value": -1.2912303168679726,
+            "lo": -1.4066212582403526,
+            "hi": -1.1830516420147825,
+            "odds_ratio_per_sd": null
+          },
+          "delta_p": {
+            "log_odds_per_sd": 0.5529514041880689,
+            "lo": 0.4489826051217824,
+            "hi": 0.6692446313983063,
+            "odds_ratio_per_sd": 1.7383761045141624
+          }
+        }
+      },
+      "logistic_refusal_mass_only": {
+        "fitted": true,
+        "n": 1922,
+        "n_success": 441,
+        "converged": true,
+        "standardisation": {
+          "refusal_mass": {
+            "mean": 0.12350150674134826,
+            "sd": 0.256569247152983
+          }
+        },
+        "bootstrap_resamples_used": 2000,
+        "bootstrap_skipped_one_class": 0,
+        "bootstrap_not_converged": 0,
+        "coefficients": {
+          "intercept": {
+            "value": -1.2366637166952914,
+            "lo": -1.3461728399193367,
+            "hi": -1.133870057154807,
+            "odds_ratio_per_sd": null
+          },
+          "refusal_mass": {
+            "log_odds_per_sd": -0.3082445179679279,
+            "lo": -0.44814668113255884,
+            "hi": -0.19573659863338302,
+            "odds_ratio_per_sd": 0.7347356399770589
+          }
+        }
+      }
+    },
+    "WildJailbreak": {
+      "n_pairs": 296,
+      "n_succeeded": 123,
+      "n_failed": 173,
+      "success_rate": 0.4155405405405405,
+      "groups": {
+        "succeeded": {
+          "n_pairs": 123,
+          "delta_p": {
+            "n": 123,
+            "median": -4.3401761845618605,
+            "lo": -5.0063989988569375,
+            "hi": -3.5754422597715507
+          },
+          "refusal_mass": {
+            "n": 123,
+            "median": 9.102711373998318e-06,
+            "lo": 1.8736479887593305e-06,
+            "hi": 3.0119383154669777e-05
+          },
+          "compliance_mass": {
+            "n": 123,
+            "median": 5.743358087784145e-06,
+            "lo": 1.879470914900594e-06,
+            "hi": 1.1996897228527814e-05
+          }
+        },
+        "failed": {
+          "n_pairs": 173,
+          "delta_p": {
+            "n": 173,
+            "median": -3.8783293475048914,
+            "lo": -4.977554075880019,
+            "hi": -2.9698429503526436
+          },
+          "refusal_mass": {
+            "n": 173,
+            "median": 4.408985114423558e-05,
+            "lo": 1.3122409654897638e-05,
+            "hi": 0.00016452110139653087
+          },
+          "compliance_mass": {
+            "n": 173,
+            "median": 2.9292705221450888e-06,
+            "lo": 1.8339186453886214e-06,
+            "hi": 5.123338723933557e-06
+          }
+        }
+      },
+      "median_difference_succeeded_minus_failed": {
+        "delta_p": {
+          "diff": -0.46184683705696905,
+          "lo": -1.6018778905034576,
+          "hi": 1.1005621362853084
+        },
+        "refusal_mass": {
+          "diff": -3.498713977023726e-05,
+          "lo": -0.0001531009311293019,
+          "hi": 3.151341707052765e-06
+        }
+      },
+      "auroc_for_success": {
+        "delta_p (higher = success)": {
+          "auroc": 0.46139386249353825,
+          "lo": 0.3949623871088451,
+          "hi": 0.5263400258454439
+        },
+        "refusal_mass (higher = success)": {
+          "auroc": 0.4092297570374548,
+          "lo": 0.34463058752206144,
+          "hi": 0.4754831221686319
+        }
+      },
+      "logistic": {
+        "fitted": true,
+        "n": 296,
+        "n_success": 123,
+        "converged": true,
+        "standardisation": {
+          "delta_p": {
+            "mean": -3.6047686179950116,
+            "sd": 4.520770343024289
+          },
+          "refusal_mass": {
+            "mean": 0.09423539250422357,
+            "sd": 0.2515643696337401
+          }
+        },
+        "bootstrap_resamples_used": 2000,
+        "bootstrap_skipped_one_class": 0,
+        "bootstrap_not_converged": 0,
+        "coefficients": {
+          "intercept": {
+            "value": -0.35663643665701505,
+            "lo": -0.6049828000273842,
+            "hi": -0.12579911581915756,
+            "odds_ratio_per_sd": null
+          },
+          "delta_p": {
+            "log_odds_per_sd": -0.09258670653099538,
+            "lo": -0.3429506595711254,
+            "hi": 0.16211432562643102,
+            "odds_ratio_per_sd": 0.9115701684506949
+          },
+          "refusal_mass": {
+            "log_odds_per_sd": -0.2977483599632244,
+            "lo": -0.7887293010745156,
+            "hi": -0.013770708573845887,
+            "odds_ratio_per_sd": 0.7424881559884441
+          }
+        }
+      },
+      "logistic_delta_p_only": {
+        "fitted": true,
+        "n": 296,
+        "n_success": 123,
+        "converged": true,
+        "standardisation": {
+          "delta_p": {
+            "mean": -3.6047686179950116,
+            "sd": 4.520770343024289
+          }
+        },
+        "bootstrap_resamples_used": 2000,
+        "bootstrap_skipped_one_class": 0,
+        "bootstrap_not_converged": 0,
+        "coefficients": {
+          "intercept": {
+            "value": -0.34428711321315913,
+            "lo": -0.5691655231206132,
+            "hi": -0.11048625168888312,
+            "odds_ratio_per_sd": null
+          },
+          "delta_p": {
+            "log_odds_per_sd": -0.1861953548795758,
+            "lo": -0.43257874502912474,
+            "hi": 0.03503648825694122,
+            "odds_ratio_per_sd": 0.8301114128258236
+          }
+        }
+      },
+      "logistic_refusal_mass_only": {
+        "fitted": true,
+        "n": 296,
+        "n_success": 123,
+        "converged": true,
+        "standardisation": {
+          "refusal_mass": {
+            "mean": 0.09423539250422357,
+            "sd": 0.25156436963374
+          }
+        },
+        "bootstrap_resamples_used": 2000,
+        "bootstrap_skipped_one_class": 0,
+        "bootstrap_not_converged": 0,
+        "coefficients": {
+          "intercept": {
+            "value": -0.356432128937041,
+            "lo": -0.6081154491931491,
+            "hi": -0.13554290583961404,
+            "odds_ratio_per_sd": null
+          },
+          "refusal_mass": {
+            "log_odds_per_sd": -0.3327689582058909,
+            "lo": -0.8014702742163666,
+            "hi": -0.06286073528438532,
+            "odds_ratio_per_sd": 0.7169358171595018
+          }
+        }
+      }
+    }
+  },
+  "sensitivity_not_truncated": {
+    "n_pairs": 180,
+    "n_succeeded": 35,
+    "n_failed": 145,
+    "success_rate": 0.19444444444444445,
+    "groups": {
+      "succeeded": {
+        "n_pairs": 35,
+        "delta_p": {
+          "n": 35,
+          "median": -2.252719243182928,
+          "lo": -3.7400119500333653,
+          "hi": -0.9852933907976772
+        },
+        "refusal_mass": {
+          "n": 35,
+          "median": 2.4735771148698404e-05,
+          "lo": 7.977957466209773e-06,
+          "hi": 0.0004826700023841113
+        },
+        "compliance_mass": {
+          "n": 35,
+          "median": 4.846201409236528e-05,
+          "lo": 1.3694674635189585e-05,
+          "hi": 0.00030956752016209066
+        }
+      },
+      "failed": {
+        "n_pairs": 145,
+        "delta_p": {
+          "n": 145,
+          "median": -1.9230547184191977,
+          "lo": -3.303863683417405,
+          "hi": -1.2708225379698108
+        },
+        "refusal_mass": {
+          "n": 145,
+          "median": 0.09089312702417374,
+          "lo": 0.013783680275082588,
+          "hi": 0.20625801384449005
+        },
+        "compliance_mass": {
+          "n": 145,
+          "median": 2.5280804038629867e-05,
+          "lo": 1.1134641681564972e-05,
+          "hi": 7.178543455665931e-05
+        }
+      }
+    },
+    "median_difference_succeeded_minus_failed": {
+      "delta_p": {
+        "diff": -0.3296645247637302,
+        "lo": -1.7901819177690115,
+        "hi": 1.4929923480749563
+      },
+      "refusal_mass": {
+        "diff": -0.09086839125302504,
+        "lo": -0.20618969100760295,
+        "hi": -0.01376822538866236
+      }
+    },
+    "auroc_for_success": {
+      "delta_p (higher = success)": {
+        "auroc": 0.49142857142857144,
+        "lo": 0.3865807221348363,
+        "hi": 0.6047175895664367
+      },
+      "refusal_mass (higher = success)": {
+        "auroc": 0.26699507389162563,
+        "lo": 0.18932413793103448,
+        "hi": 0.3545569006506506
+      }
+    },
+    "logistic": {
+      "fitted": true,
+      "n": 180,
+      "n_success": 35,
+      "converged": true,
+      "standardisation": {
+        "delta_p": {
+          "mean": -2.8065777973680777,
+          "sd": 3.37052126724959
+        },
+        "refusal_mass": {
+          "mean": 0.27489224199256374,
+          "sd": 0.37542092550929407
+        }
+      },
+      "bootstrap_resamples_used": 2000,
+      "bootstrap_skipped_one_class": 0,
+      "bootstrap_not_converged": 0,
+      "coefficients": {
+        "intercept": {
+          "value": -1.7822692273345009,
+          "lo": -14.148538862522502,
+          "hi": -1.3216303378556968,
+          "odds_ratio_per_sd": null
+        },
+        "delta_p": {
+          "log_odds_per_sd": 0.24585717419625458,
+          "lo": -0.12355574017707886,
+          "hi": 0.6862826507778962,
+          "odds_ratio_per_sd": 1.278716926725887
+        },
+        "refusal_mass": {
+          "log_odds_per_sd": -1.2597935922451682,
+          "lo": -18.440079534557444,
+          "hi": -0.595218373526352,
+          "odds_ratio_per_sd": 0.2837125809333659
+        }
+      }
+    },
+    "logistic_delta_p_only": {
+      "fitted": true,
+      "n": 180,
+      "n_success": 35,
+      "converged": true,
+      "standardisation": {
+        "delta_p": {
+          "mean": -2.806577797368078,
+          "sd": 3.3705212672495897
+        }
+      },
+      "bootstrap_resamples_used": 2000,
+      "bootstrap_skipped_one_class": 0,
+      "bootstrap_not_converged": 0,
+      "coefficients": {
+        "intercept": {
+          "value": -1.4224500296613278,
+          "lo": -1.8337246120245507,
+          "hi": -1.0886410517592593,
+          "odds_ratio_per_sd": null
+        },
+        "delta_p": {
+          "log_odds_per_sd": -0.05900413353684371,
+          "lo": -0.406521215979661,
+          "hi": 0.3400847502049085,
+          "odds_ratio_per_sd": 0.9427028724519902
+        }
+      }
+    },
+    "logistic_refusal_mass_only": {
+      "fitted": true,
+      "n": 180,
+      "n_success": 35,
+      "converged": true,
+      "standardisation": {
+        "refusal_mass": {
+          "mean": 0.27489224199256374,
+          "sd": 0.375420925509294
+        }
+      },
+      "bootstrap_resamples_used": 2000,
+      "bootstrap_skipped_one_class": 0,
+      "bootstrap_not_converged": 0,
+      "coefficients": {
+        "intercept": {
+          "value": -1.76317932697335,
+          "lo": -13.016141402914668,
+          "hi": -1.3126670312614719,
+          "odds_ratio_per_sd": null
+        },
+        "refusal_mass": {
+          "log_odds_per_sd": -1.150499637885648,
+          "lo": -16.792713388300648,
+          "hi": -0.5231648266924289,
+          "odds_ratio_per_sd": 0.31647860516878834
+        }
+      }
+    }
+  },
+  "not_understood_harmful_pairs": {
+    "n": 462,
+    "delta_p": {
+      "n": 462,
+      "median": -7.373746258319256,
+      "lo": -7.804804705108442,
+      "hi": -7.095192092108056
+    },
+    "refusal_mass_adv": {
+      "n": 462,
+      "median": 0.003676722291857004,
+      "lo": 0.0031262944161426277,
+      "hi": 0.004485680256038904
+    }
+  },
+  "benign_pairs_descriptive": {
+    "n": 296,
+    "delta_p": {
+      "n": 296,
+      "median": 6.71709768331838,
+      "lo": 6.20055236708499,
+      "hi": 7.149013748743137
+    },
+    "refusal_mass_adv": {
+      "n": 296,
+      "median": 9.259508442482911e-05,
+      "lo": 3.252669130233698e-05,
+      "hi": 0.00019471516861813143
+    },
+    "refusal_mass_van": {
+      "n": 296,
+      "median": 1.798125867935596e-05,
+      "lo": 8.723550308786798e-06,
+      "hi": 4.10447501053568e-05
+    },
+    "note": "Mistral refused 0 of 296 benign adversarial prompts, so a benign-control comparison (H2) is not possible"
+  },
+  "not_replicable_here": [
+    "last_instruction position (not saved in this harvest)",
+    "A6 layer sweep (see M3/M4)"
+  ],
+  "statistics": {
+    "estimator": "median",
+    "interval": "percentile bootstrap over pairs",
+    "n_boot": 2000,
+    "alpha": 0.05,
+    "seed": 0,
+    "logistic": "IRLS, predictors standardised on the full sample, ridge 1e-6, coefficients are log-odds per SD"
+  },
+  "runtime_seconds": 225.7
+}
