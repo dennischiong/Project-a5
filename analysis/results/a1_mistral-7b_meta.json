@@ -1,0 +1,57 @@
+{
+  "created_at": "2026-11-17T02:10:24.484568+00:00",
+  "analysis": "A1 displacement per tactic",
+  "owner": "WS2 (Kayson)",
+  "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+  "model_alias": "mistral-7b",
+  "harvest": "mistral-7b__wj-sorry__hf-bf16-bs1",
+  "harvest_meta": {
+    "config_name": "hf-bf16-bs1",
+    "gpu": "NVIDIA L40S",
+    "n_prompts": 13229,
+    "position": "prompt[-1]",
+    "sweep_layers": [
+      0
+    ],
+    "pairs_table_sha256": "d240ec658e9e797d"
+  },
+  "position": "last_prefill (prompt[-1])",
+  "layer": 31,
+  "stored_as": "prenorm_last (residual stream entering final norm, float32)",
+  "pairs_measured": 10796,
+  "pairs_not_finite": 0,
+  "tactic_groups": 21,
+  "degenerate_tactic_groups": 0,
+  "by_source": {
+    "SORRY-Bench": {
+      "n": 8796,
+      "median": 0.903214693069458,
+      "lo": 0.8962958924472332,
+      "hi": 0.9098041757941245
+    },
+    "WildJailbreak": {
+      "n": 2000,
+      "median": 0.9968129992485046,
+      "lo": 0.9890289776027202,
+      "hi": 1.004879142343998
+    }
+  },
+  "baselines": "NOT AVAILABLE for Mistral: the harvest has no paraphrase / length-filler control pairs",
+  "a9_precision_floor": "NOT MEASURED for Mistral",
+  "rank_vs_llama": {
+    "n_tactic_groups_in_both": 21,
+    "spearman_rho": 0.9389610389610389,
+    "p_value": 2.996681118684518e-10,
+    "rho_ci_lo": 0.8022036031177369,
+    "rho_ci_hi": 0.9843044902274231
+  },
+  "repeatability_full_vs_sub4000": null,
+  "statistics": {
+    "estimator": "median",
+    "interval": "percentile bootstrap",
+    "n_boot": 2000,
+    "alpha": 0.05,
+    "seed": 0
+  },
+  "runtime_seconds": 25.8
+}
