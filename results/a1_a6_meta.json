@@ -1,0 +1,81 @@
+{
+  "created_at": "2026-11-14T05:24:47.173303+00:00",
+  "analyses": [
+    "A1 displacement per tactic",
+    "A6 layer sweep (last_prefill only)"
+  ],
+  "owner": "WS2 (Kayson)",
+  "source_activations": {
+    "file": "qwen25-7b__hf-nf4-c6__e7f5ea94__last_prefill_multilayer.npz",
+    "harvested_by": "WS1 (Dennis)",
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "config": "hf-nf4-c6",
+    "spec_hash": "e7f5ea94",
+    "quantization": "nf4",
+    "inference_dtype": "fp16",
+    "gpu": "Tesla T4",
+    "harness": "plain HF hooks, NOT Undercurrent",
+    "extraction_point": "last_prefill",
+    "layers_cached": [
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      27
+    ],
+    "n_prompts_cached": 18500,
+    "hidden_size": 3584,
+    "storage_dtype": "float16"
+  },
+  "pairing": {
+    "pair_map": "pair_map__d240ec65.parquet",
+    "pairs_table": "pairs_table_v1_final-2.csv",
+    "pairs_measured": 16515,
+    "pairs_dropped_not_in_cache": 0,
+    "tactics": 55
+  },
+  "headline_layer": 27,
+  "statistics": {
+    "estimator": "median",
+    "interval": "percentile bootstrap",
+    "n_boot": 2000,
+    "alpha": 0.05,
+    "seed": 0
+  },
+  "floors": {
+    "paraphrase": {
+      "n_pairs": 1499,
+      "rel_l2_median": 0.38162803649902344,
+      "rel_l2_lo": 0.3722513437271118,
+      "rel_l2_hi": 0.39068669080734253,
+      "cos_dist_median": 0.07263261079788208
+    },
+    "length_filler": {
+      "n_pairs": 500,
+      "rel_l2_median": 0.35008426010608673,
+      "rel_l2_lo": 0.3347972184419632,
+      "rel_l2_hi": 0.36475101113319397,
+      "cos_dist_median": 0.05964004993438721
+    },
+    "numerical_precision_floor_p95": {
+      "rel_l2": 0.0570406546305953
+    },
+    "numerical_quantization_floor_p95": {
+      "rel_l2": 0.21934088304408314
+    }
+  },
+  "deviations_to_state_in_the_paper": [
+    "Activations are Qwen2.5-7B, not Llama-3.1-8B: the Llama harvest did not run because the available GPU could not hold it in bf16.",
+    "Activations are 4-bit NF4, not the bf16 reference configuration. The measured NF4-vs-bf16 displacement is an upper bound on contamination; a paired difference partly cancels systematic quantization error, and a paired-delta floor under NF4 has not been measured.",
+    "The harvest used plain HF hooks rather than Undercurrent, so these rows do not carry an Undercurrent version as section 6 of the spec requires.",
+    "A6 is the layer sweep only. The position split needs last_instruction, which this cache does not contain."
+  ],
+  "outputs": [
+    "a1_per_pair_qwen25-7b.csv",
+    "a1_summary_by_tactic_qwen25-7b.csv",
+    "a6_layer_sweep_qwen25-7b.csv",
+    "a1_a6_meta.json"
+  ]
+}
