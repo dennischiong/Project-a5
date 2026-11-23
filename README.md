@@ -45,3 +45,36 @@ pip install -r requirements.txt
 - Every result states its serving config (backend, concurrency, dtype, quantization, GPU, Undercurrent version).
 - **No raw harmful prompt/reply text in git or Drive archives** – activations and ids only.
 - Activations never go in git: they live as `.tpxz` archives in the `a5-activations` Drive folder.
+
+## WS3: algebraic and geometric analyses (Hasif)
+
+A2 (harmfulness direction r̂ and Δp, figure F2), A5 (tactic geometry), A7 (style vs content, H3), A8 (low-rank
+structure) and X5 (direction stability under 4-bit weights), on the hidden state at `prompt[-1]` of the last decoder
+layer before the final norm. r̂ is fitted on vanilla TRAIN pairs only; splits are 70/15/15 by sha256(pair_id); CIs are
+95% bootstrap over pairs (2,000 resamples, seed 0). The hypotheses and decision rules are in `prereg.md` (locked
+17 Oct 2026; sha256 in `prereg_lock.json`).
+
+| Path | What it does |
+|---|---|
+| `analysis/lib.py`, `geometry.py` | Loading, splits, r̂, projections, bootstrap CIs, effect sizes; the A2/A5/A7/A8/X5 maths |
+| `analysis/ws3_pilot.py` | `run_all(folder, view)`: every WS3 analysis and figure for one extraction folder |
+| `analysis/regenerate_all.py` | Every WS3 figure (including paper figure F2) and `results/*.json` from one command, over all folders under `$A5_WORK_ROOT` |
+| `analysis/figures.py`, `plotstyle.py`, `diagrams.py` | Figures (shared style: harmful orange, benign blue, adversarial hatched) |
+| `analysis/pilot_*.py`, `harvest_figures.py`, `prereg_tools.py`, `team_inputs.py`, `notebook_maps.py`, `contact_sheet.py` | Week 3 pilot (A1-A3), shard checks, pre-registration lock, Colab helpers |
+| `harvest/ws3_harvest.py` | Gemma-2-9B / Mistral-7B / Qwen prompt-position harvest (HF, batch 1; `--config c1` bf16 or `c6` NF4) |
+| `harvest/ws3_pilot_extract.py`, `pilot_extract.py`, `token_check.py` | Qwen2.5-1.5B pilots and the chat-template token-position check |
+| `harvest/dennis_harvest_convert.py` | Converts Dennis's Qwen2.5-7B `.tpxz` harvest + pair map into the same folder format |
+| `tests/` | Tests on synthetic data with planted answers (no model, no GPU, no real prompts) |
+
+Run (Colab, CPU):
+
+```bash
+pip install -r requirements.txt
+python -m pytest tests -q
+A5_WORK_ROOT=/content/drive/MyDrive/a5-work python analysis/regenerate_all.py
+```
+
+Settings: `A5_WORK_ROOT` = the Drive folder holding `ws3_pilot/` and `ws3_harvest/` (default
+`/content/drive/MyDrive/a5-work`); `A5_TEST_FOLDER` = a private folder for archive tests (default
+`/content/drive/MyDrive/a5-test`). The pairs table goes in `data/` and is git-ignored. Nothing in WS3 prints, plots or
+saves prompt text: outputs are ids, counts and numbers only.
