@@ -27,6 +27,7 @@ analysis/          # A1-A9 and X4-X6 notebooks; shared utils
 probes/            # G1-G4 and X1-X3; baselines
 demo/              # inline Undercurrent guard-probe demo
 release/           # HF Hub conversion and dataset card
+tests/             # tests on synthetic data (no model, no GPU, no real prompts)
 figures/  paper/
 ```
 
